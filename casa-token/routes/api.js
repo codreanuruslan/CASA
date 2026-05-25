@@ -259,12 +259,53 @@ async function buildStonFiQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE 
       updatedAt: Date.now()
     };
   } catch (error) {
+    if (fromSymbol !== 'TON' && toSymbol !== 'TON') {
+      const viaTonQuote = await buildStonFiMultiHopQuote({
+        fromSymbol,
+        toSymbol,
+        amount: numericAmount,
+        slippage: numericSlippage
+      });
+      if (!viaTonQuote.error) return viaTonQuote;
+    }
+
     return {
       error: 'STON.fi quote is unavailable for this pair or amount',
       code: 'STONFI_QUOTE_FAILED',
       details: error.message
     };
   }
+}
+
+async function buildStonFiMultiHopQuote({ fromSymbol, toSymbol, amount, slippage }) {
+  const firstHop = await buildStonFiQuote({ from: fromSymbol, to: 'TON', amount, slippage });
+  if (firstHop.error) return firstHop;
+
+  const secondHop = await buildStonFiQuote({
+    from: 'TON',
+    to: toSymbol,
+    amount: firstHop.estimatedAmount,
+    slippage
+  });
+  if (secondHop.error) return secondHop;
+
+  return {
+    from: fromSymbol,
+    to: toSymbol,
+    amount: firstHop.amount,
+    estimatedAmount: secondHop.estimatedAmount,
+    minimumReceived: secondHop.minimumReceived,
+    feeRate: firstHop.feeRate + secondHop.feeRate,
+    feeAmount: secondHop.feeAmount,
+    slippage,
+    priceImpact: parseFloat((firstHop.priceImpact + secondHop.priceImpact).toFixed(4)),
+    route: [fromSymbol, 'TON', toSymbol],
+    provider: 'STON.fi',
+    simulated: false,
+    source: 'stonfi',
+    hops: [firstHop, secondHop],
+    updatedAt: Date.now()
+  };
 }
 
 async function getCasaPrice() {
