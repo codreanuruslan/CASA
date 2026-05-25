@@ -14,10 +14,14 @@
 
 const express = require('express');
 const { StonApiClient } = require('@ston-fi/api');
+const { dexFactory, Client } = require('@ston-fi/sdk');
 const priceEngine = require('../priceEngine');
 
 const router = express.Router();
 const stonApi = new StonApiClient();
+const tonClient = new Client({
+  endpoint: process.env.TON_RPC_ENDPOINT || 'https://toncenter.com/api/v2/jsonRPC'
+});
 const CASA_JETTON_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 
 const BASE_STATS = {
@@ -278,6 +282,89 @@ async function buildStonFiQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE 
   }
 }
 
+function senderArgsToTonConnectTransaction(txParams) {
+  return {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [
+      {
+        address: txParams.to.toString(),
+        amount: txParams.value.toString(),
+        payload: txParams.body?.toBoc().toString('base64')
+      }
+    ]
+  };
+}
+
+async function buildStonFiTransaction({ from, to, amount, slippage = DEFAULT_SLIPPAGE, walletAddress }) {
+  const fromSymbol = String(from || '').toUpperCase();
+  const toSymbol = String(to || '').toUpperCase();
+  const numericAmount = Number(amount);
+  const numericSlippage = Number(slippage);
+
+  if (!walletAddress) return { error: 'Connect TON wallet first' };
+  if (fromSymbol === toSymbol) return { error: 'Choose different tokens' };
+  if (!Number.isFinite(numericAmount) || numericAmount < MIN_SWAP_AMOUNT) return { error: 'Enter a valid amount' };
+
+  const configError = getStonConfigError(fromSymbol, toSymbol);
+  if (configError) return { error: configError, code: 'TOKEN_NOT_CONFIGURED' };
+
+  const fromToken = getToken(fromSymbol);
+  const toToken = getToken(toSymbol);
+  const offerUnits = decimalToUnits(amount, fromToken.decimals);
+  if (!offerUnits || BigInt(offerUnits) <= 0n) return { error: 'Enter a valid amount' };
+
+  const simulation = await stonApi.simulateSwap({
+    offerAddress: fromToken.address,
+    askAddress: toToken.address,
+    offerUnits,
+    slippageTolerance: String(numericSlippage / 100),
+    dexV2: true
+  });
+
+  const dexContracts = dexFactory(simulation.router);
+  const routerContract = tonClient.open(dexContracts.Router.create(simulation.router.address));
+  const proxyTon = dexContracts.pTON.create(simulation.router.ptonMasterAddress);
+  const commonParams = {
+    userWalletAddress: walletAddress,
+    receiverAddress: walletAddress,
+    refundAddress: walletAddress,
+    excessesAddress: walletAddress,
+    offerAmount: BigInt(simulation.offerUnits),
+    minAskAmount: BigInt(simulation.minAskUnits || simulation.recommendedMinAskUnits)
+  };
+
+  let txParams;
+  if (fromSymbol === 'TON') {
+    txParams = await routerContract.getSwapTonToJettonTxParams({
+      ...commonParams,
+      proxyTon,
+      askJettonAddress: toToken.address,
+      askJettonWalletAddress: simulation.askJettonWallet
+    });
+  } else if (toSymbol === 'TON') {
+    txParams = await routerContract.getSwapJettonToTonTxParams({
+      ...commonParams,
+      offerJettonAddress: fromToken.address,
+      offerJettonWalletAddress: simulation.offerJettonWallet,
+      askJettonWalletAddress: simulation.askJettonWallet,
+      proxyTon
+    });
+  } else {
+    txParams = await routerContract.getSwapJettonToJettonTxParams({
+      ...commonParams,
+      offerJettonAddress: fromToken.address,
+      offerJettonWalletAddress: simulation.offerJettonWallet,
+      askJettonAddress: toToken.address,
+      askJettonWalletAddress: simulation.askJettonWallet
+    });
+  }
+
+  return {
+    transaction: senderArgsToTonConnectTransaction(txParams),
+    simulation
+  };
+}
+
 async function buildStonFiMultiHopQuote({ fromSymbol, toSymbol, amount, slippage }) {
   const firstHop = await buildStonFiQuote({ from: fromSymbol, to: 'TON', amount, slippage });
   if (firstHop.error) return firstHop;
@@ -457,6 +544,51 @@ router.post('/swap/prepare', async (req, res) => {
       },
       error: 'DEX execution is not configured yet'
     });
+    return;
+  }
+
+  if (provider === 'stonfi') {
+    if (quote.hops?.length) {
+      res.status(501).json({
+        ok: false,
+        code: 'MULTIHOP_TX_PENDING',
+        data: {
+          quote,
+          provider,
+          walletAddress,
+          nextStep: 'This quote uses multiple STON.fi hops. Execute direct TON/CASA swaps first or implement multi-message route execution.'
+        },
+        error: 'Multi-hop transaction builder is pending'
+      });
+      return;
+    }
+
+    try {
+      const built = await buildStonFiTransaction({ ...req.body, walletAddress });
+      if (built.error) {
+        res.status(400).json({ ok: false, code: built.code, error: built.error });
+        return;
+      }
+
+      res.json({
+        ok: true,
+        data: {
+          quote,
+          provider,
+          walletAddress,
+          transaction: built.transaction,
+          status: 'ready'
+        }
+      });
+    } catch (error) {
+      res.status(502).json({
+        ok: false,
+        code: 'STONFI_TX_BUILD_FAILED',
+        data: { quote, provider, walletAddress },
+        error: 'Failed to build STON.fi transaction',
+        details: error.message
+      });
+    }
     return;
   }
 
