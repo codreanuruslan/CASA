@@ -13,9 +13,11 @@
  */
 
 const express = require('express');
+const { StonApiClient } = require('@ston-fi/api');
 const priceEngine = require('../priceEngine');
 
 const router = express.Router();
+const stonApi = new StonApiClient();
 
 const BASE_STATS = {
   totalSupply: 1_000_000_000,
@@ -30,14 +32,31 @@ const BASE_STATS = {
 };
 
 const SWAP_TOKENS = {
-  TON: { symbol: 'TON', name: 'Toncoin', decimals: 9, usdPrice: 6.2 },
-  USDT: { symbol: 'USDT', name: 'Tether USD', decimals: 6, usdPrice: 1 },
-  CASA: { symbol: 'CASA', name: 'CASA Token', decimals: 9 }
+  TON: {
+    symbol: 'TON',
+    name: 'Toncoin',
+    decimals: 9,
+    address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c'
+  },
+  USDT: {
+    symbol: 'USDT',
+    name: 'Tether USD',
+    decimals: 6,
+    address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs'
+  },
+  CASA: {
+    symbol: 'CASA',
+    name: 'CASA Token',
+    decimals: 9,
+    address: process.env.CASA_JETTON_ADDRESS || ''
+  }
 };
 
 const SWAP_FEE_RATE = 0.003;
 const DEFAULT_SLIPPAGE = 0.5;
 const MIN_SWAP_AMOUNT = 0.000001;
+const PRICE_CACHE_TTL = 15_000;
+let casaPriceCache = null;
 
 let dynamicHolders = BASE_STATS.holders;
 
@@ -63,8 +82,8 @@ router.get('/token', (req, res) => {
   });
 });
 
-router.get('/price', (req, res) => {
-  const data = priceEngine.getPrice();
+router.get('/price', async (req, res) => {
+  const data = await getCasaPrice();
 
   res.json({
     ok: true,
@@ -86,8 +105,8 @@ router.get('/price/history', (req, res) => {
   res.json({ ok: true, data: history });
 });
 
-router.get('/stats', (req, res) => {
-  const { price } = priceEngine.getPrice();
+router.get('/stats', async (req, res) => {
+  const { price } = await getCasaPrice();
   const marketCap = Math.round(price * BASE_STATS.circulatingSupply);
   const fdv = Math.round(price * BASE_STATS.totalSupply);
 
@@ -143,9 +162,132 @@ router.get('/contract', (req, res) => {
   });
 });
 
-function getTokenUsdPrice(symbol) {
-  if (symbol === 'CASA') return priceEngine.getPrice().price;
-  return SWAP_TOKENS[symbol]?.usdPrice;
+function decimalToUnits(value, decimals) {
+  const normalized = String(value).trim();
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+
+  const [whole, fraction = ''] = normalized.split('.');
+  const paddedFraction = (fraction + '0'.repeat(decimals)).slice(0, decimals);
+  return (BigInt(whole) * 10n ** BigInt(decimals) + BigInt(paddedFraction || '0')).toString();
+}
+
+function unitsToDecimal(units, decimals) {
+  const value = BigInt(units || '0');
+  const base = 10n ** BigInt(decimals);
+  const whole = value / base;
+  const fraction = (value % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return Number(whole.toString() + (fraction ? '.' + fraction : ''));
+}
+
+function getProvider() {
+  return (process.env.DEX_PROVIDER || 'demo').toLowerCase();
+}
+
+function getToken(symbol) {
+  const token = SWAP_TOKENS[symbol];
+  if (!token) return null;
+  if (symbol === 'CASA') {
+    return { ...token, address: process.env.CASA_JETTON_ADDRESS || token.address };
+  }
+  return token;
+}
+
+function getStonConfigError(fromSymbol, toSymbol) {
+  const fromToken = getToken(fromSymbol);
+  const toToken = getToken(toSymbol);
+  if (!fromToken || !toToken) return 'Unsupported token pair';
+  if (!fromToken.address) return `${fromSymbol} address is not configured`;
+  if (!toToken.address) return `${toSymbol} address is not configured`;
+  return null;
+}
+
+async function buildStonFiQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE }) {
+  const fromSymbol = String(from || '').toUpperCase();
+  const toSymbol = String(to || '').toUpperCase();
+  const numericAmount = Number(amount);
+  const numericSlippage = Number(slippage);
+
+  if (fromSymbol === toSymbol) return { error: 'Choose different tokens' };
+  if (!Number.isFinite(numericAmount) || numericAmount < MIN_SWAP_AMOUNT) return { error: 'Enter a valid amount' };
+  if (!Number.isFinite(numericSlippage) || numericSlippage < 0.1 || numericSlippage > 5) {
+    return { error: 'Slippage must be between 0.1% and 5%' };
+  }
+
+  const configError = getStonConfigError(fromSymbol, toSymbol);
+  if (configError) return { error: configError, code: 'TOKEN_NOT_CONFIGURED' };
+
+  const fromToken = getToken(fromSymbol);
+  const toToken = getToken(toSymbol);
+  const offerUnits = decimalToUnits(amount, fromToken.decimals);
+  if (!offerUnits || BigInt(offerUnits) <= 0n) return { error: 'Enter a valid amount' };
+
+  try {
+    const simulation = await stonApi.simulateSwap({
+      offerAddress: fromToken.address,
+      askAddress: toToken.address,
+      offerUnits,
+      slippageTolerance: String(numericSlippage / 100),
+      dexV2: true
+    });
+
+    const estimatedAmount = unitsToDecimal(simulation.askUnits, toToken.decimals);
+    const minimumReceived = unitsToDecimal(simulation.minAskUnits || simulation.recommendedMinAskUnits, toToken.decimals);
+    const feeAmount = unitsToDecimal(simulation.feeUnits, toToken.decimals);
+
+    return {
+      from: fromSymbol,
+      to: toSymbol,
+      amount: parseFloat(numericAmount.toFixed(9)),
+      estimatedAmount,
+      minimumReceived,
+      feeRate: Number(simulation.feePercent || 0),
+      feeAmount,
+      slippage: parseFloat(numericSlippage.toFixed(2)),
+      priceImpact: parseFloat(Number(simulation.priceImpact || 0).toFixed(4)),
+      route: [fromSymbol, toSymbol],
+      provider: 'STON.fi',
+      simulated: false,
+      source: 'stonfi',
+      routerAddress: simulation.routerAddress,
+      poolAddress: simulation.poolAddress,
+      offerUnits: simulation.offerUnits,
+      askUnits: simulation.askUnits,
+      minAskUnits: simulation.minAskUnits,
+      swapRate: simulation.swapRate,
+      recommendedSlippageTolerance: simulation.recommendedSlippageTolerance,
+      gasParams: simulation.gasParams,
+      updatedAt: Date.now()
+    };
+  } catch (error) {
+    return {
+      error: 'STON.fi quote is unavailable for this pair or amount',
+      code: 'STONFI_QUOTE_FAILED',
+      details: error.message
+    };
+  }
+}
+
+async function getCasaPrice() {
+  const now = Date.now();
+  if (casaPriceCache && now - casaPriceCache.updatedAt < PRICE_CACHE_TTL) return casaPriceCache;
+
+  const casaToken = getToken('CASA');
+  if (getProvider() === 'stonfi' && casaToken.address) {
+    const quote = await buildStonFiQuote({ from: 'CASA', to: 'USDT', amount: '1', slippage: DEFAULT_SLIPPAGE });
+    if (!quote.error && Number.isFinite(quote.estimatedAmount) && quote.estimatedAmount > 0) {
+      const fallback = priceEngine.getPrice();
+      casaPriceCache = {
+        price: quote.estimatedAmount,
+        change24h: fallback.change24h,
+        changePct24h: fallback.changePct24h,
+        updatedAt: now,
+        source: 'stonfi'
+      };
+      return casaPriceCache;
+    }
+  }
+
+  return { ...priceEngine.getPrice(), source: 'simulated' };
 }
 
 function buildSwapQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE }) {
@@ -170,8 +312,8 @@ function buildSwapQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE }) {
     return { error: 'Slippage must be between 0.1% and 5%' };
   }
 
-  const fromUsd = getTokenUsdPrice(fromSymbol);
-  const toUsd = getTokenUsdPrice(toSymbol);
+  const fromUsd = fromSymbol === 'CASA' ? priceEngine.getPrice().price : (fromSymbol === 'TON' ? 1.8 : 1);
+  const toUsd = toSymbol === 'CASA' ? priceEngine.getPrice().price : (toSymbol === 'TON' ? 1.8 : 1);
   const grossToAmount = (numericAmount * fromUsd) / toUsd;
   const feeAmount = grossToAmount * SWAP_FEE_RATE;
   const toAmount = grossToAmount - feeAmount;
@@ -196,14 +338,16 @@ function buildSwapQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE }) {
 }
 
 router.get('/swap/tokens', (req, res) => {
-  res.json({ ok: true, data: Object.values(SWAP_TOKENS) });
+  res.json({ ok: true, data: Object.keys(SWAP_TOKENS).map(getToken) });
 });
 
 router.get('/swap/config', (req, res) => {
-  const provider = process.env.DEX_PROVIDER || 'demo';
-  const configured = provider !== 'demo' && Boolean(
-    process.env.STONFI_ROUTER_ADDRESS || process.env.DEDUST_FACTORY_ADDRESS
-  );
+  const provider = getProvider();
+  const configured = provider === 'stonfi'
+    ? Boolean(getToken('CASA').address)
+    : provider === 'dedust'
+      ? Boolean(process.env.DEDUST_FACTORY_ADDRESS && getToken('CASA').address)
+      : false;
 
   res.json({
     ok: true,
@@ -213,30 +357,45 @@ router.get('/swap/config', (req, res) => {
       tonConnect: true,
       supportedProviders: ['stonfi', 'dedust', 'demo'],
       message: configured
-        ? 'DEX provider configuration is present.'
-        : 'DEX provider is not configured yet. Quote and wallet connection are available; blockchain execution is disabled.'
+        ? 'Production quotes are enabled.'
+        : 'Production DEX quote provider is not fully configured. Set DEX_PROVIDER=stonfi and CASA_JETTON_ADDRESS.'
     }
   });
 });
 
-router.get('/swap/quote', (req, res) => {
-  const quote = buildSwapQuote(req.query);
+async function getQuote(params) {
+  if (getProvider() === 'stonfi') return buildStonFiQuote(params);
+  return buildSwapQuote(params);
+}
+
+router.get('/swap/quote', async (req, res) => {
+  const quote = await getQuote(req.query);
   if (quote.error) {
-    res.status(400).json({ ok: false, error: quote.error });
+    res.status(quote.code === 'STONFI_QUOTE_FAILED' ? 502 : 400).json({
+      ok: false,
+      code: quote.code,
+      error: quote.error,
+      details: quote.details
+    });
     return;
   }
 
   res.json({ ok: true, data: quote });
 });
 
-router.post('/swap/prepare', (req, res) => {
-  const quote = buildSwapQuote(req.body);
+router.post('/swap/prepare', async (req, res) => {
+  const quote = await getQuote(req.body);
   if (quote.error) {
-    res.status(400).json({ ok: false, error: quote.error });
+    res.status(quote.code === 'STONFI_QUOTE_FAILED' ? 502 : 400).json({
+      ok: false,
+      code: quote.code,
+      error: quote.error,
+      details: quote.details
+    });
     return;
   }
 
-  const provider = process.env.DEX_PROVIDER || 'demo';
+  const provider = getProvider();
   const walletAddress = req.body.walletAddress;
 
   if (!walletAddress) {
