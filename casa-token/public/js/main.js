@@ -350,7 +350,7 @@
     }
 
     function copyContract() {
-        const address = 'EQCxYz9ABC123DEF456GHI789CASA_TON_JETTONxYz9';
+        const address = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
         writeClipboard(address).then(() => {
             const btn = document.querySelector('.copy-btn');
             const original = btn.innerHTML;

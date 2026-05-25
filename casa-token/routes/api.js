@@ -18,6 +18,7 @@ const priceEngine = require('../priceEngine');
 
 const router = express.Router();
 const stonApi = new StonApiClient();
+const CASA_JETTON_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 
 const BASE_STATS = {
   totalSupply: 1_000_000_000,
@@ -48,7 +49,7 @@ const SWAP_TOKENS = {
     symbol: 'CASA',
     name: 'CASA Token',
     decimals: 9,
-    address: process.env.CASA_JETTON_ADDRESS || ''
+    address: process.env.CASA_JETTON_ADDRESS || CASA_JETTON_ADDRESS
   }
 };
 
@@ -77,7 +78,7 @@ router.get('/token', (req, res) => {
       network: BASE_STATS.network,
       standard: BASE_STATS.standard,
       totalSupply: BASE_STATS.totalSupply,
-      contract: process.env.CONTRACT_ADDRESS || 'EQCxYz9ABC123DEF456GHI789CASA_TON_JETTONxYz9'
+      contract: process.env.CONTRACT_ADDRESS || CASA_JETTON_ADDRESS
     }
   });
 });
@@ -153,7 +154,7 @@ router.get('/contract', (req, res) => {
   res.json({
     ok: true,
     data: {
-      address: process.env.CONTRACT_ADDRESS || 'EQCxYz9ABC123DEF456GHI789CASA_TON_JETTONxYz9',
+      address: process.env.CONTRACT_ADDRESS || CASA_JETTON_ADDRESS,
       network: BASE_STATS.network,
       standard: BASE_STATS.standard,
       verified: true,
@@ -180,7 +181,7 @@ function unitsToDecimal(units, decimals) {
 }
 
 function getProvider() {
-  return (process.env.DEX_PROVIDER || 'demo').toLowerCase();
+  return (process.env.DEX_PROVIDER || 'stonfi').toLowerCase();
 }
 
 function getToken(symbol) {
