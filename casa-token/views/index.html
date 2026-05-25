@@ -37,7 +37,6 @@
         </ul>
         <div class="nav-actions">
             <div id="tonConnectButton" class="ton-connect-root"></div>
-            <button class="btn btn-primary" type="button" onclick="openModal()">Купить CASA</button>
             <button class="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="mobileMenu"><span></span><span></span><span></span></button>
         </div>
     </nav>
@@ -52,7 +51,6 @@
         <li><a href="#faq">FAQ</a></li>
         <li><a href="#community">Сообщество</a></li>
     </ul>
-    <button class="btn btn-primary" type="button" onclick="openModal()">Купить CASA</button>
 </div>
 
 <section class="hero">
@@ -89,12 +87,7 @@
             </div>
 
             <div class="hero-actions">
-                <button class="btn btn-primary btn-large" type="button" onclick="openModal()">
-                    Купить CASA
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                        <path d="M5 10h10m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
+                <button class="btn btn-primary btn-large" type="button" onclick="scrollToSection('swap')">Перейти к обмену</button>
                 <button class="btn btn-secondary btn-large" type="button" onclick="scrollToSection('tokenomics')">Смотреть токеномику</button>
             </div>
 
@@ -443,19 +436,6 @@
     </div>
 </section>
 
-<section class="cta-section">
-    <div class="container">
-        <div class="cta-box">
-            <h2>Готов стать частью CASA?</h2>
-            <p>Присоединяйся к тысячам холдеров и получи доступ к эксклюзивным возможностям.</p>
-            <div class="cta-actions">
-                <button class="btn btn-primary btn-large" type="button" onclick="openModal()">Купить CASA сейчас</button>
-                <a href="#" class="btn btn-secondary btn-large">Читать Whitepaper</a>
-            </div>
-        </div>
-    </div>
-</section>
-
 <footer class="footer">
     <div class="container">
         <div class="footer-top">
@@ -502,34 +482,6 @@
     </div>
 </footer>
 
-<div class="modal-overlay" id="modal" onclick="closeModal(event)" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buyTitle" onclick="event.stopPropagation()">
-        <button class="modal-close" type="button" onclick="closeModal()" aria-label="Закрыть окно покупки">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-        </button>
-        <h3 id="buyTitle">Купить CASA</h3>
-        <p>Выберите платформу для обмена:</p>
-        <div class="exchange-list">
-            <a href="#" class="exchange-item">
-                <div class="exchange-logo">🔷</div>
-                <div><div class="exchange-name">STON.fi</div><div class="exchange-desc">TON/CASA · DEX</div></div>
-                <span>→</span>
-            </a>
-            <a href="#" class="exchange-item">
-                <div class="exchange-logo">💧</div>
-                <div><div class="exchange-name">DeDust</div><div class="exchange-desc">TON/CASA · DEX</div></div>
-                <span>→</span>
-            </a>
-            <a href="#" class="exchange-item">
-                <div class="exchange-logo">👛</div>
-                <div><div class="exchange-name">Tonkeeper</div><div class="exchange-desc">Встроенный swap</div></div>
-                <span>→</span>
-            </a>
-        </div>
-    </div>
-</div>
 <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 <script src="/js/main.js" defer></script>
 </body>

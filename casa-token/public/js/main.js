@@ -368,26 +368,8 @@
         });
     }
 
-    // ── Modal ──────────────────────────────────────────────────────────────────
-    function openModal() {
-        const modal = document.getElementById('modal');
-        modal.classList.add('active');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-        modal.querySelector('.modal-close').focus();
-    }
-
-    function closeModal(e) {
-        if (e && e.target !== e.currentTarget) return;
-        const modal = document.getElementById('modal');
-        modal.classList.remove('active');
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-    }
-
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            closeModal();
             setMobileMenu(false);
         }
     });
