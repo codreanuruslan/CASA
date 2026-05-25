@@ -581,7 +581,14 @@
         @media (max-width: 600px) {
             .container, .nav { padding-left: 18px; padding-right: 18px; }
             .nav-actions .btn { display: none; }
-            .ton-connect-root { display: none; }
+            .nav-actions { gap: 8px; margin-left: auto; }
+            .ton-connect-root {
+                max-width: 150px;
+                min-width: 0;
+                overflow: hidden;
+                transform: scale(.88);
+                transform-origin: right center;
+            }
             .hero { padding-top: 92px; }
             .hero-title { font-size: clamp(40px, 14vw, 56px); }
             .hero-subtitle { font-size: 16px; }

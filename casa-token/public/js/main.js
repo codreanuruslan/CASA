@@ -143,6 +143,7 @@
     const dexStatus = document.getElementById('dexStatus');
     let latestQuote = null;
     let quoteTimer = null;
+    let tonConnectInitPromise = null;
 
     function shortAddress(address) {
         if (!address) return 'Не подключен';
@@ -158,9 +159,13 @@
     }
 
     async function initTonConnect() {
+        if (tonConnectUI) return tonConnectUI;
+        if (tonConnectInitPromise) return tonConnectInitPromise;
+
+        tonConnectInitPromise = (async () => {
         if (!window.TON_CONNECT_UI?.TonConnectUI) {
             if (walletStatus) walletStatus.textContent = 'TON Connect недоступен';
-            return;
+            return null;
         }
 
         const configResponse = await fetch('/api/dapp/config', { headers: { Accept: 'application/json' } });
@@ -183,6 +188,31 @@
         tonConnectUI.onStatusChange(wallet => updateWalletState(wallet));
         await tonConnectUI.connectionRestored;
         updateWalletState(tonConnectUI.wallet);
+        return tonConnectUI;
+        })();
+
+        try {
+            return await tonConnectInitPromise;
+        } catch (error) {
+            tonConnectInitPromise = null;
+            throw error;
+        }
+    }
+
+    async function openWalletConnect() {
+        try {
+            const ui = tonConnectUI || await initTonConnect();
+            if (!ui) {
+                setSwapStatus('TON Connect недоступен в этом браузере.', 'error');
+                return false;
+            }
+            setSwapStatus('Открываем TON Connect...');
+            await ui.openModal();
+            return true;
+        } catch (error) {
+            setSwapStatus(error?.message || 'Не удалось открыть TON Connect.', 'error');
+            return false;
+        }
     }
 
     async function loadSwapConfig() {
@@ -265,13 +295,7 @@
         });
         loadSwapConfig().catch(() => {});
 
-        walletConnectAction.addEventListener('click', async () => {
-            if (!tonConnectUI) {
-                setSwapStatus('TON Connect еще не загружен.', 'error');
-                return;
-            }
-            await tonConnectUI.openModal();
-        });
+        walletConnectAction.addEventListener('click', openWalletConnect);
 
         [swapFromAmount, swapFromToken, swapToToken, swapSlippage].forEach(control => {
             control.addEventListener('input', queueSwapQuote);
@@ -289,7 +313,7 @@
             event.preventDefault();
             if (!tonConnectUI?.connected) {
                 setSwapStatus('Подключите TON-кошелек для подготовки обмена.');
-                await tonConnectUI?.openModal();
+                await openWalletConnect();
                 return;
             }
 
