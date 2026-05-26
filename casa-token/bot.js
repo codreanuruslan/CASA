@@ -51,12 +51,9 @@ function actionKeyboard() {
   const siteUrl = getPublicUrl();
   const swapUrl = siteUrl + '/#swap';
   const address = getCasaAddress();
-  const buyButton = siteUrl.startsWith('https://')
-    ? Markup.button.webApp('Купить CASA', swapUrl)
-    : Markup.button.url('Купить CASA', swapUrl);
 
   return Markup.inlineKeyboard([
-    [buyButton],
+    [Markup.button.url('Купить CASA', swapUrl)],
     [
       Markup.button.url('Открыть сайт', siteUrl),
       Markup.button.url('Контракт', 'https://tonviewer.com/' + address)
