@@ -64,6 +64,12 @@
     animate();
 
     // ── Mobile menu ────────────────────────────────────────────────────────────
+    const telegramWebApp = window.Telegram?.WebApp;
+    if (telegramWebApp) {
+        telegramWebApp.ready();
+        telegramWebApp.expand();
+    }
+
     const burger     = document.querySelector('.burger');
     const mobileMenu = document.querySelector('.mobile-menu');
     function setMobileMenu(open) {

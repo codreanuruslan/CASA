@@ -55,9 +55,12 @@ function actionKeyboard() {
   const siteUrl = getPublicUrl();
   const swapUrl = siteUrl + '/buy?connect=1';
   const address = getCasaAddress();
+  const buyButton = siteUrl.startsWith('https://')
+    ? Markup.button.webApp('Купить CASA', swapUrl)
+    : Markup.button.url('Купить CASA', swapUrl);
 
   return Markup.inlineKeyboard([
-    [Markup.button.url('Купить CASA', swapUrl)],
+    [buyButton],
     [
       Markup.button.url('Открыть сайт', siteUrl),
       Markup.button.url('Контракт', 'https://tonviewer.com/' + address)
@@ -112,7 +115,11 @@ async function sendContract(ctx) {
     '<b>Проверен:</b> ' + (data.verified ? 'да' : 'нет'),
     Markup.inlineKeyboard([
       [Markup.button.url('Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
-      [Markup.button.url('Купить CASA', getPublicUrl() + '/buy?connect=1')]
+      [
+        getPublicUrl().startsWith('https://')
+          ? Markup.button.webApp('Купить CASA', getPublicUrl() + '/buy?connect=1')
+          : Markup.button.url('Купить CASA', getPublicUrl() + '/buy?connect=1')
+      ]
     ])
   );
 }
