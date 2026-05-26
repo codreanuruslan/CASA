@@ -8,6 +8,7 @@ require('dotenv').config();
 const indexRouter = require('./routes');
 const apiRouter = require('./routes/api');
 const priceEngine = require('./priceEngine');
+const { attachTelegramBot } = require('./bot');
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.get('/api/dapp/config', (req, res) => {
 
 app.use('/', indexRouter);
 app.use('/api', apiRouter);
+attachTelegramBot(app);
 
 priceEngine.start();
 
