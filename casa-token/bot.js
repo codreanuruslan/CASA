@@ -196,6 +196,36 @@ function attachTelegramBot(app) {
     res.json({ ok: true, data: info });
   });
 
+  app.get('/api/telegram/status', async (req, res) => {
+    if (!hasAdminAccess(req)) {
+      res.status(403).json({ ok: false, error: 'Forbidden' });
+      return;
+    }
+
+    const webhookUrl = getPublicUrl() + webhookPath;
+    const [me, info] = await Promise.all([
+      bot.telegram.getMe(),
+      bot.telegram.getWebhookInfo()
+    ]);
+
+    res.json({
+      ok: true,
+      data: {
+        bot: {
+          id: me.id,
+          username: me.username,
+          firstName: me.first_name,
+          canJoinGroups: me.can_join_groups
+        },
+        expectedWebhookUrl: webhookUrl,
+        actualWebhookUrl: info.url,
+        pendingUpdateCount: info.pending_update_count,
+        lastErrorDate: info.last_error_date,
+        lastErrorMessage: info.last_error_message
+      }
+    });
+  });
+
   return { bot, webhookPath };
 }
 
