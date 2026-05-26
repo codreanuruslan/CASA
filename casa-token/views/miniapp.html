@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Купить CASA</title>
+  <meta name="description" content="Покупка CASA через TON Connect">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preload" href="/tonconnect-manifest.json" as="fetch" crossorigin>
+  <link rel="stylesheet" href="/css/miniapp.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <main class="miniapp">
+    <section class="panel">
+      <div class="topline">
+        <div>
+          <span>CASA Token</span>
+          <h1>Купить CASA</h1>
+        </div>
+        <div id="tonConnectButton" class="ton-connect-root"></div>
+      </div>
+
+      <form id="miniSwapForm" class="swap-form">
+        <label>
+          <span>Отдаете</span>
+          <div class="input-row">
+            <input id="swapFromAmount" type="number" min="0" step="0.01" value="1">
+            <strong>TON</strong>
+          </div>
+        </label>
+
+        <label>
+          <span>Получаете</span>
+          <div class="input-row">
+            <input id="swapToAmount" type="text" value="0.00" readonly>
+            <strong>CASA</strong>
+          </div>
+        </label>
+
+        <div class="quote-box">
+          <div><span>Курс</span><strong id="quoteRate">-</strong></div>
+          <div><span>Минимум</span><strong id="quoteMinimum">-</strong></div>
+          <div><span>Маршрут</span><strong id="quoteRoute">TON → CASA</strong></div>
+        </div>
+
+        <button id="connectButton" class="btn secondary" type="button">Подключить кошелек</button>
+        <button id="swapButton" class="btn primary" type="submit">Подготовить swap</button>
+        <p id="status" class="status">Открываем TON Connect...</p>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="/js/miniapp.js" defer></script>
+</body>
+</html>

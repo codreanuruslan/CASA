@@ -53,7 +53,7 @@ async function readApi(path) {
 
 function actionKeyboard() {
   const siteUrl = getPublicUrl();
-  const swapUrl = siteUrl + '/buy?connect=1';
+  const swapUrl = siteUrl + '/miniapp';
   const address = getCasaAddress();
   const buyButton = siteUrl.startsWith('https://')
     ? Markup.button.webApp('Купить CASA', swapUrl)
@@ -117,8 +117,8 @@ async function sendContract(ctx) {
       [Markup.button.url('Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
       [
         getPublicUrl().startsWith('https://')
-          ? Markup.button.webApp('Купить CASA', getPublicUrl() + '/buy?connect=1')
-          : Markup.button.url('Купить CASA', getPublicUrl() + '/buy?connect=1')
+          ? Markup.button.webApp('Купить CASA', getPublicUrl() + '/miniapp')
+          : Markup.button.url('Купить CASA', getPublicUrl() + '/miniapp')
       ]
     ])
   );
