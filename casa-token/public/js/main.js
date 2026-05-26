@@ -239,7 +239,9 @@
         });
 
         tonConnectUI.onStatusChange(wallet => updateWalletState(wallet));
-        await tonConnectUI.connectionRestored;
+        tonConnectUI.connectionRestored
+            .then(() => updateWalletState(tonConnectUI.wallet))
+            .catch(() => {});
         updateWalletState(tonConnectUI.wallet);
         return tonConnectUI;
         })();
@@ -358,10 +360,7 @@
             swapToToken.value = 'CASA';
         }
         queueSwapQuote();
-        await initTonConnect().catch(() => null);
-        window.setTimeout(() => {
-            openWalletConnect().catch(() => {});
-        }, 700);
+        await openWalletConnect();
     }
 
     if (swapForm) {
