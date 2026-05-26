@@ -3,7 +3,8 @@ const { Telegraf, Markup } = require('telegraf');
 const DEFAULT_CASA_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 
 function getPublicUrl() {
-  return (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+  const url = (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+  return url === 'https://casafond.com' ? 'https://www.casafond.com' : url;
 }
 
 function getCasaAddress() {
@@ -52,7 +53,7 @@ async function readApi(path) {
 
 function actionKeyboard() {
   const siteUrl = getPublicUrl();
-  const swapUrl = siteUrl + '/#swap';
+  const swapUrl = siteUrl + '/buy?connect=1';
   const address = getCasaAddress();
 
   return Markup.inlineKeyboard([
@@ -111,7 +112,7 @@ async function sendContract(ctx) {
     '<b>Проверен:</b> ' + (data.verified ? 'да' : 'нет'),
     Markup.inlineKeyboard([
       [Markup.button.url('Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
-      [Markup.button.url('Купить CASA', getPublicUrl() + '/#swap')]
+      [Markup.button.url('Купить CASA', getPublicUrl() + '/buy?connect=1')]
     ])
   );
 }

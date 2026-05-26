@@ -98,6 +98,7 @@
         const el = document.getElementById(id);
         if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
     }
+    window.scrollToSection = scrollToSection;
 
     // ── Live price ticker ──────────────────────────────────────────────────────
     async function updatePrice() {
@@ -335,6 +336,28 @@
         quoteTimer = setTimeout(() => loadSwapQuote().catch(() => {}), 250);
     }
 
+    function shouldAutoOpenBuy() {
+        const params = new URLSearchParams(window.location.search);
+        return window.location.pathname === '/buy' || params.get('connect') === '1' || params.get('buy') === 'casa';
+    }
+
+    async function startBuyFlow() {
+        if (!swapForm || !shouldAutoOpenBuy()) return;
+        const swapSection = document.getElementById('swap');
+        if (swapSection) {
+            window.setTimeout(() => scrollToSection('swap'), 250);
+        }
+        if (swapFromToken && swapToToken) {
+            swapFromToken.value = 'TON';
+            swapToToken.value = 'CASA';
+        }
+        queueSwapQuote();
+        await initTonConnect().catch(() => null);
+        window.setTimeout(() => {
+            openWalletConnect().catch(() => {});
+        }, 700);
+    }
+
     if (swapForm) {
         initTonConnect().catch(() => {
             if (walletStatus) walletStatus.textContent = 'Ошибка TON Connect';
@@ -400,6 +423,7 @@
         });
 
         loadSwapQuote().catch(() => {});
+        startBuyFlow().catch(() => {});
     }
 
     // ── Copy contract address ──────────────────────────────────────────────────
