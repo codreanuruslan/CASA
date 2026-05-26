@@ -11,8 +11,9 @@ function getCasaAddress() {
 }
 
 function money(value, digits = 2) {
+  if (value === null || value === undefined || value === '') return 'н/д';
   const number = Number(value);
-  if (!Number.isFinite(number)) return '-';
+  if (!Number.isFinite(number)) return 'н/д';
   return '$' + number.toLocaleString('en-US', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
@@ -20,14 +21,16 @@ function money(value, digits = 2) {
 }
 
 function compact(value) {
+  if (value === null || value === undefined || value === '') return 'н/д';
   const number = Number(value);
-  if (!Number.isFinite(number)) return '-';
+  if (!Number.isFinite(number)) return 'н/д';
   return number.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function percent(value) {
+  if (value === null || value === undefined || value === '') return 'н/д';
   const number = Number(value);
-  if (!Number.isFinite(number)) return '-';
+  if (!Number.isFinite(number)) return 'н/д';
   return (number >= 0 ? '+' : '') + number.toFixed(2) + '%';
 }
 
@@ -90,6 +93,7 @@ async function sendStats(ctx) {
     '<b>Market cap:</b> ' + money(data.marketCap, 0) + '\n' +
     '<b>FDV:</b> ' + money(data.fdv, 0) + '\n' +
     '<b>Volume 24h:</b> ' + money(data.volume24h, 0) + '\n' +
+    '<b>Liquidity:</b> ' + money(data.liquidityUsd, 0) + '\n' +
     '<b>Holders:</b> ' + compact(data.holders) + '\n' +
     '<b>Network:</b> ' + data.network,
     actionKeyboard()

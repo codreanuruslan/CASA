@@ -110,15 +110,61 @@
 
         const payload = await response.json();
         const data = payload.data || payload;
-        const changePct = Number(data.changePct24h) || 0;
-        priceEl.textContent = '$' + Number(data.price).toFixed(6);
+        const price = Number(data.price);
+        const changePct = Number(data.changePct24h);
+        priceEl.textContent = Number.isFinite(price) ? '$' + price.toFixed(6) : '-';
         if (changeEl) {
-            changeEl.textContent = (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%';
-            changeEl.className   = 'stat-change ' + (changePct >= 0 ? 'positive' : 'negative');
+            changeEl.textContent = Number.isFinite(changePct) ? (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%' : '-';
+            changeEl.className   = 'stat-change' + (Number.isFinite(changePct) ? ' ' + (changePct >= 0 ? 'positive' : 'negative') : '');
         }
     }
+
+    function formatUsdCompact(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '-';
+        return '$' + numeric.toLocaleString('en-US', {
+            notation: 'compact',
+            maximumFractionDigits: 2
+        });
+    }
+
+    function formatNumberCompact(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '-';
+        return numeric.toLocaleString('en-US', {
+            notation: 'compact',
+            maximumFractionDigits: 2
+        });
+    }
+
+    function setChangeValue(element, value, suffix = '%') {
+        if (!element) return;
+        const numeric = Number(value);
+        element.textContent = Number.isFinite(numeric) ? (numeric >= 0 ? '+' : '') + numeric.toFixed(2) + suffix : '-';
+        element.className = 'stat-change' + (Number.isFinite(numeric) ? ' ' + (numeric >= 0 ? 'positive' : 'negative') : '');
+    }
+
+    async function updateStats() {
+        const response = await fetch('/api/stats', { headers: { Accept: 'application/json' } });
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        const data = payload.data || payload;
+        const marketCapEl = document.getElementById('marketCap');
+        const holdersEl = document.getElementById('holdersCount');
+        const volumeEl = document.getElementById('volume24h');
+
+        if (marketCapEl) marketCapEl.textContent = formatUsdCompact(data.marketCap || data.fdv);
+        if (holdersEl) holdersEl.textContent = formatNumberCompact(data.holders);
+        if (volumeEl) volumeEl.textContent = formatUsdCompact(data.volume24h);
+        setChangeValue(document.getElementById('market-cap-change'), data.marketCapChange24h);
+        setChangeValue(document.getElementById('holders-change'), data.holdersGrowth24h, '');
+        setChangeValue(document.getElementById('volume-change'), data.volumeChange24h);
+    }
     updatePrice().catch(() => {});
+    updateStats().catch(() => {});
     setInterval(() => updatePrice().catch(() => {}), 5000);
+    setInterval(() => updateStats().catch(() => {}), 30000);
 
     // ── Swap widget ───────────────────────────────────────────────────────────
     let tonConnectUI = null;
@@ -220,7 +266,7 @@
             const response = await fetch('/api/swap/config', { headers: { Accept: 'application/json' } });
             const payload = await response.json();
             if (!response.ok || !payload.ok) return;
-            if (dexProvider) dexProvider.textContent = payload.data.provider === 'demo' ? 'Demo Router' : payload.data.provider;
+            if (dexProvider) dexProvider.textContent = payload.data.provider;
             if (dexStatus) dexStatus.textContent = payload.data.message;
         } catch (error) {
             if (dexStatus) dexStatus.textContent = 'Не удалось загрузить конфигурацию DEX.';
