@@ -35,20 +35,38 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-app.get('/tonconnect-manifest.json', (req, res) => {
-  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '').replace('https://casafond.com', 'https://www.casafond.com');
+function getPublicOrigin(req) {
+  return (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`)
+    .replace(/\/$/, '')
+    .replace('https://casafond.com', 'https://www.casafond.com');
+}
+
+function sendTonConnectManifest(req, res, name, urlPath = '') {
+  const origin = getPublicOrigin(req);
 
   res.setHeader('Cache-Control', 'public, max-age=86400');
 
   res.json({
-    url: origin,
-    name: 'CasaFond',
+    url: `${origin}${urlPath}`,
+    name,
     iconUrl: `${origin}/img/casa-icon-180.png`
   });
+}
+
+app.get('/tonconnect-manifest.json', (req, res) => {
+  sendTonConnectManifest(req, res, 'CasaFond');
+});
+
+app.get('/tonconnect-site-manifest.json', (req, res) => {
+  sendTonConnectManifest(req, res, 'CasaFond Site');
+});
+
+app.get('/tonconnect-miniapp-manifest.json', (req, res) => {
+  sendTonConnectManifest(req, res, 'CasaFond Mini App', '/miniapp');
 });
 
 app.get('/api/dapp/config', (req, res) => {
-  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const origin = getPublicOrigin(req);
   const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(origin);
   const isHttps = origin.startsWith('https://');
 
@@ -56,7 +74,8 @@ app.get('/api/dapp/config', (req, res) => {
     ok: true,
     data: {
       publicUrl: origin,
-      manifestUrl: `${origin}/tonconnect-manifest.json`,
+      manifestUrl: `${origin}/tonconnect-site-manifest.json`,
+      miniAppManifestUrl: `${origin}/tonconnect-miniapp-manifest.json`,
       tonConnectReady: isHttps && !isLocalhost,
       warnings: [
         ...(isLocalhost ? ['PUBLIC_URL points to localhost. Mobile wallets cannot fetch localhost from a scanned QR.'] : []),

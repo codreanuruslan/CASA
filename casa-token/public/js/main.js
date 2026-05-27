@@ -257,6 +257,22 @@
         document.head.appendChild(link);
     }
 
+    function createScopedStorage(scope) {
+        return {
+            getItem(key) {
+                return Promise.resolve(window.localStorage.getItem(scope + key));
+            },
+            setItem(key, value) {
+                window.localStorage.setItem(scope + key, value);
+                return Promise.resolve();
+            },
+            removeItem(key) {
+                window.localStorage.removeItem(scope + key);
+                return Promise.resolve();
+            }
+        };
+    }
+
     if (shouldAutoOpenBuy()) {
         preloadTonConnectScript();
     }
@@ -292,8 +308,13 @@
             setSwapStatus(dappConfig.warnings.join(' '), 'error');
         }
 
+        const connector = new window.TON_CONNECT_UI.TonConnect({
+            manifestUrl: dappConfig.manifestUrl || window.location.origin + '/tonconnect-site-manifest.json',
+            storage: createScopedStorage('casa-site:')
+        });
+
         tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: dappConfig.manifestUrl || window.location.origin + '/tonconnect-manifest.json',
+            connector,
             buttonRootId: 'tonConnectButton',
             language: 'ru',
             restoreConnection: false,

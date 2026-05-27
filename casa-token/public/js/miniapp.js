@@ -42,6 +42,22 @@
     ]);
   }
 
+  function createScopedStorage(scope) {
+    return {
+      getItem(key) {
+        return Promise.resolve(window.localStorage.getItem(scope + key));
+      },
+      setItem(key, value) {
+        window.localStorage.setItem(scope + key, value);
+        return Promise.resolve();
+      },
+      removeItem(key) {
+        window.localStorage.removeItem(scope + key);
+        return Promise.resolve();
+      }
+    };
+  }
+
   function waitForTonConnectGlobal() {
     if (window.TON_CONNECT_UI?.TonConnectUI) return Promise.resolve(true);
     return new Promise((resolve, reject) => {
@@ -94,8 +110,13 @@
       throw new Error('TON Connect SDK не найден после загрузки.');
     }
 
+    const connector = new window.TON_CONNECT_UI.TonConnect({
+      manifestUrl: window.location.origin + '/tonconnect-miniapp-manifest.json',
+      storage: createScopedStorage('casa-miniapp:')
+    });
+
     tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: window.location.origin + '/tonconnect-manifest.json',
+      connector,
       buttonRootId: 'tonConnectButton',
       language: 'ru',
       restoreConnection: false,
