@@ -82,8 +82,7 @@
     if (tonConnectUI) return tonConnectUI;
     await loadTonConnectScript();
     if (!window.TON_CONNECT_UI?.TonConnectUI) {
-      setStatus('TON Connect еще загружается...', 'error');
-      return null;
+      throw new Error('TON Connect SDK не найден после загрузки.');
     }
 
     tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({

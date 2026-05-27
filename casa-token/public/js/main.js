@@ -282,7 +282,7 @@
         await loadTonConnectScript();
         if (!window.TON_CONNECT_UI?.TonConnectUI) {
             if (walletStatus) walletStatus.textContent = 'TON Connect недоступен';
-            return null;
+            throw new Error('TON Connect SDK не найден после загрузки.');
         }
 
         const configResponse = await fetch('/api/dapp/config', { headers: { Accept: 'application/json' } });
@@ -322,10 +322,6 @@
     async function openWalletConnect() {
         try {
             const ui = tonConnectUI || await initTonConnect();
-            if (!ui) {
-                setSwapStatus('TON Connect недоступен в этом браузере.', 'error');
-                return false;
-            }
             setSwapStatus('Открываем TON Connect...');
             await ui.openModal();
             return true;
