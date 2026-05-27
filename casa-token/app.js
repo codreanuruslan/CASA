@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {
-    if (filePath.includes(`${path.sep}vendor${path.sep}`)) {
+    if (filePath.includes(`${path.sep}vendor${path.sep}`) || filePath.endsWith(`${path.sep}wallets-v2.json`)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -32,11 +32,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 app.get('/tonconnect-manifest.json', (req, res) => {
-  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '').replace('https://casafond.com', 'https://www.casafond.com');
+
+  res.setHeader('Cache-Control', 'public, max-age=86400');
 
   res.json({
     url: origin,
-    name: 'CASA Token',
+    name: 'CasaFond',
     iconUrl: `${origin}/img/casa-icon-180.png`
   });
 });

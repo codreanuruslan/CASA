@@ -39,6 +39,9 @@
       manifestUrl: window.location.origin + '/tonconnect-manifest.json',
       buttonRootId: 'tonConnectButton',
       language: 'ru',
+      walletsListConfiguration: {
+        walletsListSource: window.location.origin + '/wallets-v2.json'
+      },
       uiPreferences: { theme: 'DARK', borderRadius: 'm' }
     });
 
