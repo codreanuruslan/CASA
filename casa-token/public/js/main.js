@@ -323,9 +323,7 @@
         try {
             const ui = tonConnectUI || await initTonConnect();
             setSwapStatus('Открываем TON Connect...');
-            ui.openModal().catch(error => {
-                setSwapStatus(error?.message || 'Не удалось открыть TON Connect.', 'error');
-            });
+            await ui.openModal();
             setSwapStatus('Выберите кошелек в TON Connect.');
             return true;
         } catch (error) {

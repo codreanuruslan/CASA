@@ -121,26 +121,12 @@
     if (!ui) return false;
     setStatus('Открываем TON Connect...');
     try {
-      if (tg && typeof ui.connectWallet === 'function') {
-        await withTimeout(ui.connectWallet(), 2500, 'Встроенный кошелек открывается слишком долго.');
-      } else {
-        ui.openModal().catch(error => {
-          setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
-        });
-      }
+      await withTimeout(ui.openModal(), 4000, 'Список кошельков открывается слишком долго.');
       setStatus('Выберите кошелек и подтвердите подключение.');
       return true;
     } catch (error) {
-      try {
-        setStatus('Открываем список кошельков...');
-        ui.openModal().catch(modalError => {
-          setStatus(modalError.message || error.message || 'Не удалось открыть TON Connect.', 'error');
-        });
-        return true;
-      } catch (modalError) {
-        setStatus(modalError.message || error.message || 'Не удалось открыть TON Connect.', 'error');
-        return false;
-      }
+      setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
+      return false;
     }
   }
 
