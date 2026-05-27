@@ -298,7 +298,7 @@
             language: 'ru',
             restoreConnection: false,
             walletsListConfiguration: {
-                walletsListSource: window.location.origin + '/wallets-v2.json'
+                walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-1'
             },
             uiPreferences: {
                 theme: 'DARK',
@@ -323,7 +323,10 @@
         try {
             const ui = tonConnectUI || await initTonConnect();
             setSwapStatus('Открываем TON Connect...');
-            await ui.openModal();
+            ui.openModal().catch(error => {
+                setSwapStatus(error?.message || 'Не удалось открыть TON Connect.', 'error');
+            });
+            setSwapStatus('Выберите кошелек в TON Connect.');
             return true;
         } catch (error) {
             setSwapStatus(error?.message || 'Не удалось открыть TON Connect.', 'error');

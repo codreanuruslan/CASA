@@ -33,6 +33,15 @@
     return number.toLocaleString('ru-RU', { maximumFractionDigits: symbol === 'CASA' ? 2 : 6 }) + ' ' + symbol;
   }
 
+  function withTimeout(promise, ms, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error(message)), ms);
+      })
+    ]);
+  }
+
   function waitForTonConnectGlobal() {
     if (window.TON_CONNECT_UI?.TonConnectUI) return Promise.resolve(true);
     return new Promise((resolve, reject) => {
@@ -91,7 +100,7 @@
       language: 'ru',
       restoreConnection: false,
       walletsListConfiguration: {
-        walletsListSource: window.location.origin + '/wallets-v2.json'
+        walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-1'
       },
       uiPreferences: { theme: 'DARK', borderRadius: 'm' }
     });
@@ -110,18 +119,23 @@
   async function openWallet() {
     const ui = await initTonConnect();
     if (!ui) return false;
-    setStatus('Подключаем встроенный TON Wallet...');
+    setStatus('Открываем TON Connect...');
     try {
       if (tg && typeof ui.connectWallet === 'function') {
-        await ui.connectWallet();
+        await withTimeout(ui.connectWallet(), 2500, 'Встроенный кошелек открывается слишком долго.');
       } else {
-        await ui.openModal();
+        ui.openModal().catch(error => {
+          setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
+        });
       }
+      setStatus('Выберите кошелек и подтвердите подключение.');
       return true;
     } catch (error) {
       try {
         setStatus('Открываем список кошельков...');
-        await ui.openModal();
+        ui.openModal().catch(modalError => {
+          setStatus(modalError.message || error.message || 'Не удалось открыть TON Connect.', 'error');
+        });
         return true;
       } catch (modalError) {
         setStatus(modalError.message || error.message || 'Не удалось открыть TON Connect.', 'error');
@@ -202,6 +216,6 @@
     }
   });
 
-  initTonConnect().then(() => openWallet()).catch(() => {});
+  window.setTimeout(() => initTonConnect().catch(() => {}), 250);
   loadQuote().catch(() => {});
 })();

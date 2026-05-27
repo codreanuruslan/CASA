@@ -1,0 +1,122 @@
+[
+  {
+    "app_name": "telegram-wallet",
+    "name": "Wallet",
+    "image": "https://wallet.tg/images/logo-288.png",
+    "about_url": "https://wallet.tg/",
+    "universal_url": "https://t.me/wallet?attach=wallet",
+    "bridge": [
+      {
+        "type": "sse",
+        "url": "https://walletbot.me/tonconnect-bridge/bridge"
+      }
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "macos",
+      "windows",
+      "linux"
+    ],
+    "features": [
+      {
+        "name": "SendTransaction",
+        "maxMessages": 255,
+        "extraCurrencySupported": true
+      },
+      {
+        "name": "SignData",
+        "types": [
+          "text",
+          "binary",
+          "cell"
+        ]
+      }
+    ]
+  },
+  {
+    "app_name": "tonkeeper",
+    "name": "Tonkeeper",
+    "image": "https://tonkeeper.com/assets/tonconnect-icon.png",
+    "tondns": "tonkeeper.ton",
+    "about_url": "https://tonkeeper.com",
+    "universal_url": "https://app.tonkeeper.com/ton-connect",
+    "deepLink": "tonkeeper-tc://",
+    "bridge": [
+      {
+        "type": "sse",
+        "url": "https://bridge.tonapi.io/bridge"
+      },
+      {
+        "type": "js",
+        "key": "tonkeeper"
+      }
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "chrome",
+      "firefox",
+      "macos",
+      "windows",
+      "linux"
+    ],
+    "features": [
+      {
+        "name": "SendTransaction",
+        "maxMessages": 255,
+        "extraCurrencySupported": true
+      },
+      {
+        "name": "SignData",
+        "types": [
+          "text",
+          "binary",
+          "cell"
+        ]
+      }
+    ]
+  },
+  {
+    "app_name": "mytonwallet",
+    "name": "MyTonWallet",
+    "image": "https://static.mytonwallet.io/icon-256.png",
+    "about_url": "https://mytonwallet.io",
+    "universal_url": "https://connect.mytonwallet.org",
+    "deepLink": "mytonwallet-tc://",
+    "bridge": [
+      {
+        "type": "js",
+        "key": "mytonwallet"
+      },
+      {
+        "type": "sse",
+        "url": "https://tonconnectbridge.mytonwallet.org/bridge/"
+      }
+    ],
+    "platforms": [
+      "chrome",
+      "windows",
+      "macos",
+      "linux",
+      "ios",
+      "android",
+      "firefox"
+    ],
+    "features": [
+      {
+        "name": "SendTransaction",
+        "maxMessages": 255,
+        "extraCurrencySupported": false
+      },
+      {
+        "name": "SignData",
+        "types": [
+          "text",
+          "binary",
+          "cell"
+        ]
+      }
+    ]
+  }
+]

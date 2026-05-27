@@ -23,7 +23,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {
-    if (filePath.includes(`${path.sep}vendor${path.sep}`) || filePath.endsWith(`${path.sep}wallets-v2.json`)) {
+    if (
+      filePath.includes(`${path.sep}vendor${path.sep}`) ||
+      filePath.endsWith(`${path.sep}wallets-v2.json`) ||
+      filePath.endsWith(`${path.sep}wallets-mini.json`)
+    ) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
