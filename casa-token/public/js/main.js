@@ -197,6 +197,23 @@
     let latestQuote = null;
     let quoteTimer = null;
     let tonConnectInitPromise = null;
+    let tonConnectScriptPromise = null;
+
+    function loadTonConnectScript() {
+        if (window.TON_CONNECT_UI?.TonConnectUI) return Promise.resolve(true);
+        if (tonConnectScriptPromise) return tonConnectScriptPromise;
+
+        tonConnectScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = '/vendor/tonconnect-ui.min.js';
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error('TON Connect SDK не загрузился.'));
+            document.head.appendChild(script);
+        });
+
+        return tonConnectScriptPromise;
+    }
 
     function shortAddress(address) {
         if (!address) return 'Не подключен';
@@ -216,6 +233,7 @@
         if (tonConnectInitPromise) return tonConnectInitPromise;
 
         tonConnectInitPromise = (async () => {
+        await loadTonConnectScript();
         if (!window.TON_CONNECT_UI?.TonConnectUI) {
             if (walletStatus) walletStatus.textContent = 'TON Connect недоступен';
             return null;
@@ -232,6 +250,7 @@
             manifestUrl: dappConfig.manifestUrl || window.location.origin + '/tonconnect-manifest.json',
             buttonRootId: 'tonConnectButton',
             language: 'ru',
+            restoreConnection: false,
             walletsListConfiguration: {
                 walletsListSource: window.location.origin + '/wallets-v2.json'
             },
@@ -242,9 +261,6 @@
         });
 
         tonConnectUI.onStatusChange(wallet => updateWalletState(wallet));
-        tonConnectUI.connectionRestored
-            .then(() => updateWalletState(tonConnectUI.wallet))
-            .catch(() => {});
         updateWalletState(tonConnectUI.wallet);
         return tonConnectUI;
         })();
@@ -367,9 +383,6 @@
     }
 
     if (swapForm) {
-        initTonConnect().catch(() => {
-            if (walletStatus) walletStatus.textContent = 'Ошибка TON Connect';
-        });
         loadSwapConfig().catch(() => {});
 
         walletConnectAction.addEventListener('click', openWalletConnect);

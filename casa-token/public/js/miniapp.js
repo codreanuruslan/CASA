@@ -39,6 +39,7 @@
       manifestUrl: window.location.origin + '/tonconnect-manifest.json',
       buttonRootId: 'tonConnectButton',
       language: 'ru',
+      restoreConnection: false,
       walletsListConfiguration: {
         walletsListSource: window.location.origin + '/wallets-v2.json'
       },
@@ -46,7 +47,6 @@
     });
 
     tonConnectUI.onStatusChange(updateWallet);
-    tonConnectUI.connectionRestored.then(() => updateWallet(tonConnectUI.wallet)).catch(() => {});
     updateWallet(tonConnectUI.wallet);
     return tonConnectUI;
   }
