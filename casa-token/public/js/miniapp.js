@@ -33,15 +33,6 @@
     return number.toLocaleString('ru-RU', { maximumFractionDigits: symbol === 'CASA' ? 2 : 6 }) + ' ' + symbol;
   }
 
-  function withTimeout(promise, ms, message) {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        window.setTimeout(() => reject(new Error(message)), ms);
-      })
-    ]);
-  }
-
   function createScopedStorage(scope) {
     return {
       getItem(key) {
@@ -127,6 +118,13 @@
     });
 
     tonConnectUI.onStatusChange(updateWallet);
+    if (typeof tonConnectUI.onModalStateChange === 'function') {
+      tonConnectUI.onModalStateChange(state => {
+        if (state?.status === 'opened') {
+          setStatus('Выберите кошелек и подтвердите подключение.');
+        }
+      });
+    }
     updateWallet(tonConnectUI.wallet);
     return tonConnectUI;
   }
@@ -142,8 +140,9 @@
     if (!ui) return false;
     setStatus('Открываем TON Connect...');
     try {
-      await withTimeout(ui.openModal(), 4000, 'Список кошельков открывается слишком долго.');
-      setStatus('Выберите кошелек и подтвердите подключение.');
+      ui.openModal().catch(error => {
+        setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
+      });
       return true;
     } catch (error) {
       setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
