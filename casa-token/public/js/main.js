@@ -319,7 +319,7 @@
             language: 'ru',
             restoreConnection: false,
             walletsListConfiguration: {
-                walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-1'
+                walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-2'
             },
             uiPreferences: {
                 theme: 'DARK',

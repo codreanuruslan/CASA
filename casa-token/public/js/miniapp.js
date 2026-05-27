@@ -15,6 +15,7 @@
   const form = document.getElementById('miniSwapForm');
   const statusEl = document.getElementById('status');
   let tonConnectUI = null;
+  let tonConnectInitPromise = null;
   let quoteTimer = null;
   let tonConnectScriptPromise = null;
   const tonConnectScriptUrls = [
@@ -96,6 +97,9 @@
 
   async function initTonConnect() {
     if (tonConnectUI) return tonConnectUI;
+    if (tonConnectInitPromise) return tonConnectInitPromise;
+
+    tonConnectInitPromise = (async () => {
     await loadTonConnectScript();
     if (!window.TON_CONNECT_UI?.TonConnectUI) {
       throw new Error('TON Connect SDK не найден после загрузки.');
@@ -112,7 +116,7 @@
       language: 'ru',
       restoreConnection: false,
       walletsListConfiguration: {
-        walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-1'
+        walletsListSource: window.location.origin + '/wallets-mini.json?v=20260527-2'
       },
       uiPreferences: { theme: 'DARK', borderRadius: 'm' }
     });
@@ -127,6 +131,14 @@
     }
     updateWallet(tonConnectUI.wallet);
     return tonConnectUI;
+    })();
+
+    try {
+      return await tonConnectInitPromise;
+    } catch (error) {
+      tonConnectInitPromise = null;
+      throw error;
+    }
   }
 
   function updateWallet(wallet) {

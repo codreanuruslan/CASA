@@ -2,7 +2,7 @@
   {
     "app_name": "telegram-wallet",
     "name": "Wallet",
-    "image": "https://wallet.tg/images/logo-288.png",
+    "image": "https://www.casafond.com/img/wallets/telegram-wallet.png",
     "about_url": "https://wallet.tg/",
     "universal_url": "https://t.me/wallet?attach=wallet",
     "bridge": [
@@ -37,7 +37,7 @@
   {
     "app_name": "tonkeeper",
     "name": "Tonkeeper",
-    "image": "https://tonkeeper.com/assets/tonconnect-icon.png",
+    "image": "https://www.casafond.com/img/wallets/tonkeeper.png",
     "tondns": "tonkeeper.ton",
     "about_url": "https://tonkeeper.com",
     "universal_url": "https://app.tonkeeper.com/ton-connect",
@@ -80,7 +80,7 @@
   {
     "app_name": "mytonwallet",
     "name": "MyTonWallet",
-    "image": "https://static.mytonwallet.io/icon-256.png",
+    "image": "https://www.casafond.com/img/wallets/mytonwallet.png",
     "about_url": "https://mytonwallet.io",
     "universal_url": "https://connect.mytonwallet.org",
     "deepLink": "mytonwallet-tc://",
