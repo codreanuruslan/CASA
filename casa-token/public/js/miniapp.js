@@ -110,13 +110,23 @@
   async function openWallet() {
     const ui = await initTonConnect();
     if (!ui) return false;
-    setStatus('Открываем TON Connect...');
+    setStatus('Подключаем встроенный TON Wallet...');
     try {
-      await ui.openModal();
+      if (tg && typeof ui.connectWallet === 'function') {
+        await ui.connectWallet();
+      } else {
+        await ui.openModal();
+      }
       return true;
     } catch (error) {
-      setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
-      return false;
+      try {
+        setStatus('Открываем список кошельков...');
+        await ui.openModal();
+        return true;
+      } catch (modalError) {
+        setStatus(modalError.message || error.message || 'Не удалось открыть TON Connect.', 'error');
+        return false;
+      }
     }
   }
 
