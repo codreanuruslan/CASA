@@ -198,6 +198,7 @@
     let quoteTimer = null;
     let tonConnectInitPromise = null;
     let tonConnectScriptPromise = null;
+    let dappConfigPromise = null;
     const tonConnectScriptUrls = [
         '/vendor/tonconnect-ui.min.js?v=2.4.4',
         'https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js'
@@ -206,18 +207,14 @@
     function waitForTonConnectGlobal() {
         if (window.TON_CONNECT_UI?.TonConnectUI) return Promise.resolve(true);
         return new Promise((resolve, reject) => {
-            const startedAt = Date.now();
-            const timer = setInterval(() => {
-                if (window.TON_CONNECT_UI?.TonConnectUI) {
-                    clearInterval(timer);
-                    resolve(true);
-                    return;
-                }
-                if (Date.now() - startedAt > 3000) {
-                    clearInterval(timer);
-                    reject(new Error('TON Connect SDK не инициализировался.'));
-                }
-            }, 50);
+            let attempts = 0;
+            const maxAttempts = 20;
+            function check() {
+                if (window.TON_CONNECT_UI?.TonConnectUI) { resolve(true); return; }
+                if (++attempts >= maxAttempts) { reject(new Error('TON Connect SDK не инициализировался.')); return; }
+                setTimeout(check, 100);
+            }
+            requestAnimationFrame(check);
         });
     }
 
@@ -227,10 +224,16 @@
 
         function loadScript(url) {
             return new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[src="' + url.split('?')[0] + '"]');
+                if (existing) {
+                    existing.addEventListener('load', () => waitForTonConnectGlobal().then(resolve, reject), { once: true });
+                    if (existing.dataset.loaded === '1') waitForTonConnectGlobal().then(resolve, reject);
+                    return;
+                }
                 const script = document.createElement('script');
                 script.src = url;
                 script.async = true;
-                script.onload = () => waitForTonConnectGlobal().then(resolve, reject);
+                script.onload = () => { script.dataset.loaded = '1'; waitForTonConnectGlobal().then(resolve, reject); };
                 script.onerror = () => reject(new Error('TON Connect SDK не загрузился.'));
                 document.head.appendChild(script);
             });
@@ -246,6 +249,15 @@
         });
 
         return tonConnectScriptPromise;
+    }
+
+    function prefetchDappConfig() {
+        if (dappConfigPromise) return dappConfigPromise;
+        dappConfigPromise = fetch('/api/dapp/config', { headers: { Accept: 'application/json' } })
+            .then(r => r.json())
+            .then(p => p.data || {})
+            .catch(() => ({}));
+        return dappConfigPromise;
     }
 
     function preloadTonConnectScript() {
@@ -273,8 +285,29 @@
         };
     }
 
+    // Always preload SDK; on /buy flows start loading immediately
     if (shouldAutoOpenBuy()) {
-        preloadTonConnectScript();
+        loadTonConnectScript().catch(() => {});
+        prefetchDappConfig();
+    } else {
+        // Preload SDK when swap section enters viewport
+        const swapSection = document.getElementById('swap');
+        if (swapSection && 'IntersectionObserver' in window) {
+            const swapObserver = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    loadTonConnectScript().catch(() => {});
+                    prefetchDappConfig();
+                    swapObserver.disconnect();
+                }
+            }, { rootMargin: '200px' });
+            swapObserver.observe(swapSection);
+        }
+        // Fallback: preload after idle
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => preloadTonConnectScript(), { timeout: 3000 });
+        } else {
+            setTimeout(preloadTonConnectScript, 2000);
+        }
     }
 
     function shortAddress(address) {
@@ -295,15 +328,17 @@
         if (tonConnectInitPromise) return tonConnectInitPromise;
 
         tonConnectInitPromise = (async () => {
-        await loadTonConnectScript();
+        // Parallel: load SDK script AND fetch dapp config simultaneously
+        const [, dappConfig] = await Promise.all([
+            loadTonConnectScript(),
+            prefetchDappConfig()
+        ]);
+
         if (!window.TON_CONNECT_UI?.TonConnectUI) {
             if (walletStatus) walletStatus.textContent = 'TON Connect недоступен';
             throw new Error('TON Connect SDK не найден после загрузки.');
         }
 
-        const configResponse = await fetch('/api/dapp/config', { headers: { Accept: 'application/json' } });
-        const configPayload = await configResponse.json();
-        const dappConfig = configPayload.data || {};
         if (dappConfig.warnings?.length) {
             setSwapStatus(dappConfig.warnings.join(' '), 'error');
         }

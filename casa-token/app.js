@@ -29,6 +29,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
       filePath.endsWith(`${path.sep}wallets-mini.json`)
     ) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      // Versioned via ?v= query string — safe for longer cache
+      res.setHeader('Cache-Control', 'public, max-age=604800');
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }

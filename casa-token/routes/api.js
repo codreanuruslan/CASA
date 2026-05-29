@@ -62,6 +62,8 @@ const STATS_CACHE_TTL = 30_000;
 const EXTERNAL_REQUEST_TIMEOUT = 10_000;
 let casaPriceCache = null;
 let casaStatsCache = null;
+let priceUpdatePromise = null;
+let statsUpdatePromise = null;
 
 router.get('/health', (req, res) => {
   res.json({ ok: true, status: 'ok' });
@@ -267,66 +269,89 @@ async function getCasaPools() {
   return [...pools.values()];
 }
 
+async function updateStatsInBackground() {
+  if (statsUpdatePromise) return statsUpdatePromise;
+  
+  statsUpdatePromise = (async () => {
+    try {
+      const [priceResult, tokenResult, assetResult, poolsResult] = await Promise.allSettled([
+        getCasaPrice(),
+        getCasaTokenData(),
+        withTimeout(stonApi.getAsset(getToken('CASA').address), 'STON.fi asset request timed out'),
+        getCasaPools()
+      ]);
+
+      const priceData = priceResult.status === 'fulfilled' ? priceResult.value : null;
+      const tokenData = tokenResult.status === 'fulfilled' ? tokenResult.value : {};
+      const assetData = assetResult.status === 'fulfilled' ? assetResult.value : {};
+      const pools = poolsResult.status === 'fulfilled' ? poolsResult.value : [];
+      const price = numberOrNull(priceData?.price);
+      const totalSupply = numberOrNull(tokenData.totalSupply);
+      const volume24h = pools.reduce((sum, pool) => sum + (numberOrNull(pool.volume24HUsd) || 0), 0);
+      const liquidityUsd = pools.reduce((sum, pool) => sum + (numberOrNull(pool.lpTotalSupplyUsd) || 0), 0);
+      const fdv = Number.isFinite(price) && Number.isFinite(totalSupply) ? Math.round(price * totalSupply) : null;
+
+      casaStatsCache = {
+        price,
+        marketCap: null,
+        fdv,
+        volume24h,
+        volumeChange24h: null,
+        holders: numberOrNull(tokenData.holders),
+        holdersGrowth24h: null,
+        circulatingSupply: null,
+        totalSupply,
+        liquidityUsd,
+        pools: pools.map(pool => ({
+          address: pool.address,
+          token0Address: pool.token0Address,
+          token1Address: pool.token1Address,
+          reserve0: pool.reserve0,
+          reserve1: pool.reserve1,
+          volume24HUsd: numberOrNull(pool.volume24HUsd),
+          liquidityUsd: numberOrNull(pool.lpTotalSupplyUsd)
+        })),
+        network: TOKEN_META.network,
+        standard: TOKEN_META.standard,
+        decimals: numberOrNull(tokenData.decimals) || numberOrNull(assetData.decimals) || TOKEN_META.decimals,
+        source: {
+          price: priceData?.source || null,
+          token: tokenData.source || null,
+          asset: assetResult.status === 'fulfilled' ? 'stonfi' : null,
+          pools: poolsResult.status === 'fulfilled' ? 'stonfi' : null
+        },
+        errors: {
+          price: priceResult.status === 'rejected' ? priceResult.reason.message : null,
+          token: tokenResult.status === 'rejected' ? tokenResult.reason.message : null,
+          asset: assetResult.status === 'rejected' ? assetResult.reason.message : null,
+          pools: poolsResult.status === 'rejected' ? poolsResult.reason.message : null
+        },
+        updatedAt: Date.now()
+      };
+    } catch (error) {
+      console.error('Failed to update CASA stats in background:', error.message);
+    } finally {
+      statsUpdatePromise = null;
+    }
+  })();
+  
+  return statsUpdatePromise;
+}
+
 async function getCasaStats() {
   const now = Date.now();
-  if (casaStatsCache && now - casaStatsCache.updatedAt < STATS_CACHE_TTL) return casaStatsCache;
+  
+  if (casaStatsCache) {
+    if (now - casaStatsCache.updatedAt >= STATS_CACHE_TTL) {
+      updateStatsInBackground().catch(() => {});
+    }
+    return casaStatsCache;
+  }
 
-  const [priceResult, tokenResult, assetResult, poolsResult] = await Promise.allSettled([
-    getCasaPrice(),
-    getCasaTokenData(),
-    withTimeout(stonApi.getAsset(getToken('CASA').address), 'STON.fi asset request timed out'),
-    getCasaPools()
-  ]);
-
-  const priceData = priceResult.status === 'fulfilled' ? priceResult.value : null;
-  const tokenData = tokenResult.status === 'fulfilled' ? tokenResult.value : {};
-  const assetData = assetResult.status === 'fulfilled' ? assetResult.value : {};
-  const pools = poolsResult.status === 'fulfilled' ? poolsResult.value : [];
-  const price = numberOrNull(priceData?.price);
-  const totalSupply = numberOrNull(tokenData.totalSupply);
-  const volume24h = pools.reduce((sum, pool) => sum + (numberOrNull(pool.volume24HUsd) || 0), 0);
-  const liquidityUsd = pools.reduce((sum, pool) => sum + (numberOrNull(pool.lpTotalSupplyUsd) || 0), 0);
-  const fdv = Number.isFinite(price) && Number.isFinite(totalSupply) ? Math.round(price * totalSupply) : null;
-
-  casaStatsCache = {
-    price,
-    marketCap: null,
-    fdv,
-    volume24h,
-    volumeChange24h: null,
-    holders: numberOrNull(tokenData.holders),
-    holdersGrowth24h: null,
-    circulatingSupply: null,
-    totalSupply,
-    liquidityUsd,
-    pools: pools.map(pool => ({
-      address: pool.address,
-      token0Address: pool.token0Address,
-      token1Address: pool.token1Address,
-      reserve0: pool.reserve0,
-      reserve1: pool.reserve1,
-      volume24HUsd: numberOrNull(pool.volume24HUsd),
-      liquidityUsd: numberOrNull(pool.lpTotalSupplyUsd)
-    })),
-    network: TOKEN_META.network,
-    standard: TOKEN_META.standard,
-    decimals: numberOrNull(tokenData.decimals) || numberOrNull(assetData.decimals) || TOKEN_META.decimals,
-    source: {
-      price: priceData?.source || null,
-      token: tokenData.source || null,
-      asset: assetResult.status === 'fulfilled' ? 'stonfi' : null,
-      pools: poolsResult.status === 'fulfilled' ? 'stonfi' : null
-    },
-    errors: {
-      price: priceResult.status === 'rejected' ? priceResult.reason.message : null,
-      token: tokenResult.status === 'rejected' ? tokenResult.reason.message : null,
-      asset: assetResult.status === 'rejected' ? assetResult.reason.message : null,
-      pools: poolsResult.status === 'rejected' ? poolsResult.reason.message : null
-    },
-    updatedAt: now
-  };
-
-  return casaStatsCache;
+  await updateStatsInBackground();
+  if (casaStatsCache) return casaStatsCache;
+  
+  throw new Error('Failed to fetch initial stats');
 }
 
 function getProvider() {
@@ -541,28 +566,48 @@ async function buildStonFiMultiHopQuote({ fromSymbol, toSymbol, amount, slippage
   };
 }
 
+async function updatePriceInBackground() {
+  if (priceUpdatePromise) return priceUpdatePromise;
+  
+  priceUpdatePromise = (async () => {
+    try {
+      const casaToken = getToken('CASA');
+      if (getProvider() === 'stonfi' && casaToken.address) {
+        const quote = await buildStonFiQuote({ from: 'CASA', to: 'USDT', amount: '1', slippage: DEFAULT_SLIPPAGE });
+        if (!quote.error && Number.isFinite(quote.estimatedAmount) && quote.estimatedAmount > 0) {
+          casaPriceCache = {
+            price: quote.estimatedAmount,
+            change24h: null,
+            changePct24h: null,
+            updatedAt: Date.now(),
+            source: 'stonfi'
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update CASA price in background:', error.message);
+    } finally {
+      priceUpdatePromise = null;
+    }
+  })();
+  
+  return priceUpdatePromise;
+}
+
 async function getCasaPrice() {
   const now = Date.now();
-  if (casaPriceCache && now - casaPriceCache.updatedAt < PRICE_CACHE_TTL) return casaPriceCache;
-
-  const casaToken = getToken('CASA');
-  if (getProvider() === 'stonfi' && casaToken.address) {
-    const quote = await buildStonFiQuote({ from: 'CASA', to: 'USDT', amount: '1', slippage: DEFAULT_SLIPPAGE });
-    if (!quote.error && Number.isFinite(quote.estimatedAmount) && quote.estimatedAmount > 0) {
-      casaPriceCache = {
-        price: quote.estimatedAmount,
-        change24h: null,
-        changePct24h: null,
-        updatedAt: now,
-        source: 'stonfi'
-      };
-      return casaPriceCache;
+  
+  if (casaPriceCache) {
+    if (now - casaPriceCache.updatedAt >= PRICE_CACHE_TTL) {
+      updatePriceInBackground().catch(() => {});
     }
-    throw new Error(quote.error || 'STON.fi quote returned no CASA price');
+    return { ...casaPriceCache, stale: now - casaPriceCache.updatedAt >= PRICE_CACHE_TTL };
   }
 
-  if (casaPriceCache) return { ...casaPriceCache, stale: true, updatedAt: now };
-  throw new Error('Production DEX provider is not configured');
+  await updatePriceInBackground();
+  if (casaPriceCache) return casaPriceCache;
+  
+  throw new Error('Production DEX provider is not configured or STON.fi quote returned no CASA price');
 }
 
 router.get('/swap/tokens', (req, res) => {
