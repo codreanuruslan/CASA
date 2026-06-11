@@ -557,6 +557,57 @@
         .footer-bottom p  { font-size: 13px; color: var(--muted); }
         .disclaimer { font-size: 12px !important; }
 
+        /* Charter */
+        .charter-section { background: var(--bg2); }
+        .charter-notice {
+            max-width: 960px;
+            margin: -24px auto 28px;
+            padding: 18px 20px;
+            border: 1px solid rgba(255,107,157,.3);
+            border-radius: 14px;
+            background: rgba(255,107,157,.07);
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .charter-notice strong { color: var(--pink); }
+        .charter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+        .charter-card {
+            position: relative;
+            padding: 28px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: var(--card);
+            overflow: hidden;
+        }
+        .charter-number {
+            position: absolute;
+            top: 18px;
+            right: 22px;
+            color: rgba(0,209,255,.16);
+            font-size: 40px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .charter-card h3 { margin-bottom: 16px; padding-right: 48px; font-size: 20px; }
+        .charter-card ul { display: flex; flex-direction: column; gap: 10px; padding-left: 20px; }
+        .charter-card li, .charter-card p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+        .charter-card p + p { margin-top: 12px; }
+        .charter-card a { color: var(--cyan); text-decoration: none; }
+        .charter-card a:hover { text-decoration: underline; }
+        .charter-example { border-color: rgba(0,209,255,.24); }
+        .charter-example strong { color: var(--text); }
+        .charter-consent {
+            margin-top: 20px;
+            padding: 28px;
+            border: 1px solid rgba(0,255,163,.22);
+            border-radius: 18px;
+            background: rgba(0,255,163,.05);
+        }
+        .charter-consent h3 { margin-bottom: 10px; font-size: 20px; }
+        .charter-consent p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+        .charter-consent p + p { margin-top: 8px; }
+
         /* ─── Responsive ──────────────────────── */
         @media (max-width: 900px) {
             .nav-links { display: none; }
@@ -574,6 +625,7 @@
             .tokenomics-grid { grid-template-columns: 1fr; }
             .token-chart-wrapper { order: -1; }
             .token-details-grid { grid-template-columns: repeat(2,1fr); }
+            .charter-grid { grid-template-columns: 1fr; }
             .social-grid { grid-template-columns: repeat(2,1fr); }
             .footer-top { flex-direction: column; gap: 32px; }
             .footer-links { flex-wrap: wrap; gap: 32px; }
@@ -612,6 +664,7 @@
             .wallet-panel { align-items: stretch; flex-direction: column; }
             .wallet-panel .btn { width: 100%; justify-content: center; }
             .token-details-grid { grid-template-columns: repeat(2,1fr); }
+            .charter-card, .charter-consent { padding: 22px 20px; }
             .social-grid { grid-template-columns: 1fr; }
             .roadmap-timeline { padding-left: 28px; }
         }

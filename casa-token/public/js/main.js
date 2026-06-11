@@ -588,6 +588,112 @@
         }
     });
 
+    // Mutual financing group charter
+    function publishCharter() {
+        if (document.getElementById('charter')) return;
+
+        const charter = document.createElement('section');
+        charter.id = 'charter';
+        charter.className = 'section charter-section';
+        charter.innerHTML = `
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-tag">Правила сообщества</span>
+                    <h2>Устав группы взаимного финансирования CASA</h2>
+                    <p class="section-desc">Правила добровольного участия, учета взносов и операций с токеном CASA.</p>
+                </div>
+
+                <div class="charter-notice" role="note">
+                    <strong>Важно:</strong> участие добровольное. CASA является криптоактивом: его цена может как вырасти, так и снизиться, вплоть до существенной потери вложенных средств. Доходность и возможность продажи по желаемой цене не гарантируются.
+                </div>
+
+                <div class="charter-grid">
+                    <article class="charter-card">
+                        <span class="charter-number">01</span>
+                        <h3>Общие положения</h3>
+                        <ul>
+                            <li>Цель группы - добровольное объединение средств участников для взаимной финансовой поддержки и приобретения токена CASA без начисления процентов между участниками.</li>
+                            <li>Фиксированного максимального количества участников нет. Новый участник принимается только при единогласном согласии действующих участников.</li>
+                            <li>До первого взноса участник должен ознакомиться с правилами и подтвердить согласие с ними.</li>
+                        </ul>
+                    </article>
+
+                    <article class="charter-card">
+                        <span class="charter-number">02</span>
+                        <h3>Взносы</h3>
+                        <ul>
+                            <li>Размер регулярного взноса и валюта заранее согласуются участниками и фиксируются в <a href="https://t.me/casafond_bot" target="_blank" rel="noopener">@casafond_bot</a>.</li>
+                            <li>Обязательный взнос вносится ежемесячно с 1-го по 5-е число включительно. Дополнительные добровольные взносы допускаются в любое время.</li>
+                            <li>Взнос считается внесенным после подтверждения платежа или зачисления купленных токенов CASA на указанный кошелек.</li>
+                            <li>Комиссии банка, платежной системы, P2P-сервиса, биржи или блокчейна оплачивает отправитель.</li>
+                        </ul>
+                    </article>
+
+                    <article class="charter-card">
+                        <span class="charter-number">03</span>
+                        <h3>Учет и общий фонд</h3>
+                        <ul>
+                            <li>Все взносы и операции отражаются в отчете бота: дата, участник, сумма, валюта, количество CASA, курс операции, комиссия и идентификатор транзакции.</li>
+                            <li>Средства могут направляться на покупку CASA только по заранее утвержденному порядку. Остаток фонда и адрес кошелька должны быть доступны участникам для проверки.</li>
+                            <li>Покупка CASA не означает гарантированного увеличения общего фонда. Его стоимость меняется вместе с рыночной ценой токена.</li>
+                        </ul>
+                    </article>
+
+                    <article class="charter-card">
+                        <span class="charter-number">04</span>
+                        <h3>Получение и вывод средств</h3>
+                        <ul>
+                            <li>Очередность и условия получения средств утверждаются участниками и публикуются в закрепленном сообщении <a href="https://t.me/casafond_bot" target="_blank" rel="noopener">@casafond_bot</a>.</li>
+                            <li>Изменение графика, досрочный вывод или продажа CASA допускаются только по решению, принятому в порядке, заранее согласованном всеми участниками.</li>
+                            <li>Участник, получивший выплату, продолжает вносить обязательные взносы до завершения текущего цикла, пока право на выплату не будет реализовано всеми его участниками.</li>
+                            <li>Фактическая сумма выплаты зависит от количества CASA, рыночного курса, доступной ликвидности и комиссий на момент продажи.</li>
+                        </ul>
+                    </article>
+
+                    <article class="charter-card">
+                        <span class="charter-number">05</span>
+                        <h3>Управление и дисциплина</h3>
+                        <ul>
+                            <li>Администратор: <a href="https://t.me/casafond_bot" target="_blank" rel="noopener">@casafond_bot</a> и назначенный организатор группы.</li>
+                            <li>Администратор ведет учет, публикует отчетность, уведомляет о сроках и исполняет утвержденные решения. Он не вправе единолично менять график, сумму взноса или назначение средств.</li>
+                            <li>Просрочка и порядок ее урегулирования фиксируются в отчете. Исключение участника и возврат средств возможны только по заранее утвержденной процедуре.</li>
+                        </ul>
+                    </article>
+
+                    <article class="charter-card charter-example">
+                        <span class="charter-number">06</span>
+                        <h3>Пример расчета</h3>
+                        <p>Если участник купил 862 CASA по цене около $1,16, затраты составят примерно $1 000. При цене $2,17 стоимость 862 CASA составит около $1 870 до вычета комиссий. При снижении цены, например до $0,80, их стоимость составит около $690.</p>
+                        <p><strong>Это только иллюстрация расчета, а не прогноз и не обещание прибыли.</strong> Спрос участников сам по себе не гарантирует рост цены.</p>
+                    </article>
+                </div>
+
+                <div class="charter-consent">
+                    <h3>Согласие с правилами</h3>
+                    <p>Вступая в группу и делая первый взнос, участник подтверждает согласие с уставом, принимает рыночные и операционные риски и несет личную ответственность за свои финансовые решения.</p>
+                    <p>Если взносы принимаются в разных валютах, источник обменного курса и момент его фиксации должны быть заранее указаны в закрепленном сообщении.</p>
+                </div>
+            </div>`;
+
+        const insertionPoint = document.getElementById('faq') || document.getElementById('community');
+        if (insertionPoint) insertionPoint.before(charter);
+        else document.querySelector('footer')?.before(charter);
+
+        document.querySelectorAll('.nav-links, .mobile-menu ul').forEach(menu => {
+            const item = document.createElement('li');
+            item.innerHTML = '<a href="#charter">Устав</a>';
+            item.querySelector('a').addEventListener('click', event => {
+                event.preventDefault();
+                setMobileMenu(false);
+                scrollToSection('charter');
+            });
+            const communityLink = Array.from(menu.children).find(child => child.querySelector('a[href="#community"]'));
+            if (communityLink) menu.insertBefore(item, communityLink);
+            else menu.appendChild(item);
+        });
+    }
+    publishCharter();
+
     // ── Token distribution colors ──────────────────────────────────────────────
     document.querySelectorAll('.distribution-item').forEach(item => {
         const color = item.dataset.color;
@@ -600,7 +706,7 @@
     });
 
     // ── Scroll-in animations ───────────────────────────────────────────────────
-    const animatedItems = document.querySelectorAll('.feature-card, .distribution-item, .detail-card, .social-card, .roadmap-item, .faq-item, .trust-item');
+    const animatedItems = document.querySelectorAll('.feature-card, .distribution-item, .detail-card, .social-card, .roadmap-item, .faq-item, .trust-item, .charter-card, .charter-consent');
     if (!reduceMotion) {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry, idx) => {
