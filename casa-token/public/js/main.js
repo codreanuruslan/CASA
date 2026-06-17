@@ -211,7 +211,7 @@
             const maxAttempts = 20;
             function check() {
                 if (window.TON_CONNECT_UI?.TonConnectUI) { resolve(true); return; }
-                if (++attempts >= maxAttempts) { reject(new Error('GRAMM Connect SDK не инициализировался.')); return; }
+                if (++attempts >= maxAttempts) { reject(new Error('TON Connect SDK не инициализировался.')); return; }
                 setTimeout(check, 100);
             }
             requestAnimationFrame(check);
@@ -234,7 +234,7 @@
                 script.src = url;
                 script.async = true;
                 script.onload = () => { script.dataset.loaded = '1'; waitForTonConnectGlobal().then(resolve, reject); };
-                script.onerror = () => reject(new Error('GRAMM Connect SDK не загрузился.'));
+                script.onerror = () => reject(new Error('TON Connect SDK не загрузился.'));
                 document.head.appendChild(script);
             });
         }
@@ -335,8 +335,8 @@
         ]);
 
         if (!window.TON_CONNECT_UI?.TonConnectUI) {
-            if (walletStatus) walletStatus.textContent = 'GRAMM Connect недоступен';
-            throw new Error('GRAMM Connect SDK не найден после загрузки.');
+            if (walletStatus) walletStatus.textContent = 'TON Connect недоступен';
+            throw new Error('TON Connect SDK не найден после загрузки.');
         }
 
         if (dappConfig.warnings?.length) {
@@ -378,12 +378,12 @@
     async function openWalletConnect() {
         try {
             const ui = tonConnectUI || await initTonConnect();
-            setSwapStatus('Открываем GRAMM Connect...');
+            setSwapStatus('Открываем TON Connect...');
             await ui.openModal();
-            setSwapStatus('Выберите кошелек в GRAMM Connect.');
+            setSwapStatus('Выберите кошелек в TON Connect.');
             return true;
         } catch (error) {
-            setSwapStatus(error?.message || 'Не удалось открыть GRAMM Connect.', 'error');
+            setSwapStatus(error?.message || 'Не удалось открыть TON Connect.', 'error');
             return false;
         }
     }
@@ -501,7 +501,7 @@
         swapForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             if (!tonConnectUI?.connected) {
-                setSwapStatus('Подключите GRAMM-кошелек для подготовки обмена.');
+                setSwapStatus('Подключите TON-кошелек для подготовки обмена.');
                 await openWalletConnect();
                 return;
             }

@@ -471,7 +471,7 @@ async function buildStonFiTransaction({ from, to, amount, slippage = DEFAULT_SLI
   const numericAmount = Number(amount);
   const numericSlippage = Number(slippage);
 
-  if (!walletAddress) return { error: 'Connect GRAMM wallet first' };
+  if (!walletAddress) return { error: 'Connect TON wallet first' };
   if (fromSymbol === toSymbol) return { error: 'Choose different tokens' };
   if (!Number.isFinite(numericAmount) || numericAmount < MIN_SWAP_AMOUNT) return { error: 'Enter a valid amount' };
 
@@ -675,7 +675,7 @@ router.post('/swap/prepare', async (req, res) => {
   const walletAddress = req.body.walletAddress;
 
   if (!walletAddress) {
-    res.status(400).json({ ok: false, error: 'Connect GRAMM wallet first' });
+    res.status(400).json({ ok: false, error: 'Connect TON wallet first' });
     return;
   }
 
@@ -741,7 +741,7 @@ router.post('/swap', (req, res) => {
   res.status(410).json({
     ok: false,
     code: 'SIMULATED_SWAP_REMOVED',
-    error: 'Simulated swap execution is disabled. Use /api/swap/prepare and sign the real GRAMM Connect transaction.'
+    error: 'Simulated swap execution is disabled. Use /api/swap/prepare and sign the real TON Connect transaction.'
   });
 });
 

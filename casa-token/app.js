@@ -82,7 +82,7 @@ app.get('/api/dapp/config', (req, res) => {
       tonConnectReady: isHttps && !isLocalhost,
       warnings: [
         ...(isLocalhost ? ['PUBLIC_URL points to localhost. Mobile wallets cannot fetch localhost from a scanned QR.'] : []),
-        ...(!isHttps ? ['PUBLIC_URL must be HTTPS for reliable GRAMM Connect wallet manifest loading.'] : [])
+        ...(!isHttps ? ['PUBLIC_URL must be HTTPS for reliable TON Connect wallet manifest loading.'] : [])
       ]
     }
   });

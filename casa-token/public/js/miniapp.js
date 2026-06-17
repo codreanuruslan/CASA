@@ -62,7 +62,7 @@
         }
         if (Date.now() - startedAt > 3000) {
           clearInterval(timer);
-          reject(new Error('GRAMM Connect SDK не инициализировался.'));
+          reject(new Error('TON Connect SDK не инициализировался.'));
         }
       }, 50);
     });
@@ -78,7 +78,7 @@
         script.src = url;
         script.async = true;
         script.onload = () => waitForTonConnectGlobal().then(resolve, reject);
-        script.onerror = () => reject(new Error('GRAMM Connect SDK не загрузился.'));
+        script.onerror = () => reject(new Error('TON Connect SDK не загрузился.'));
         document.head.appendChild(script);
       });
     }
@@ -102,7 +102,7 @@
     tonConnectInitPromise = (async () => {
     await loadTonConnectScript();
     if (!window.TON_CONNECT_UI?.TonConnectUI) {
-      throw new Error('GRAMM Connect SDK не найден после загрузки.');
+      throw new Error('TON Connect SDK не найден после загрузки.');
     }
 
     const connector = new window.TON_CONNECT_UI.TonConnect({
@@ -150,14 +150,14 @@
   async function openWallet() {
     const ui = await initTonConnect();
     if (!ui) return false;
-    setStatus('Открываем GRAMM Connect...');
+    setStatus('Открываем TON Connect...');
     try {
       ui.openModal().catch(error => {
-        setStatus(error.message || 'Не удалось открыть GRAMM Connect.', 'error');
+        setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
       });
       return true;
     } catch (error) {
-      setStatus(error.message || 'Не удалось открыть GRAMM Connect.', 'error');
+      setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
       return false;
     }
   }
