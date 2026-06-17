@@ -29,14 +29,14 @@ const chainTonClient = new TonClient({
 const CASA_JETTON_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 
 const TOKEN_META = {
-  network: 'TON',
+  network: 'GRAMM',
   standard: 'Jetton (TEP-74)',
   decimals: 9
 };
 
 const SWAP_TOKENS = {
-  TON: {
-    symbol: 'TON',
+  GRAMM: {
+    symbol: 'GRAMM',
     name: 'Toncoin',
     decimals: 9,
     address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c'
@@ -247,7 +247,7 @@ async function getCasaTokenData() {
 
 async function getCasaPools() {
   const casa = getToken('CASA').address;
-  const pairAddresses = ['TON', 'USDT']
+  const pairAddresses = ['GRAMM', 'USDT']
     .map(symbol => getToken(symbol)?.address)
     .filter(Boolean);
 
@@ -434,7 +434,7 @@ async function buildStonFiQuote({ from, to, amount, slippage = DEFAULT_SLIPPAGE 
       updatedAt: Date.now()
     };
   } catch (error) {
-    if (fromSymbol !== 'TON' && toSymbol !== 'TON') {
+    if (fromSymbol !== 'GRAMM' && toSymbol !== 'GRAMM') {
       const viaTonQuote = await buildStonFiMultiHopQuote({
         fromSymbol,
         toSymbol,
@@ -471,7 +471,7 @@ async function buildStonFiTransaction({ from, to, amount, slippage = DEFAULT_SLI
   const numericAmount = Number(amount);
   const numericSlippage = Number(slippage);
 
-  if (!walletAddress) return { error: 'Connect TON wallet first' };
+  if (!walletAddress) return { error: 'Connect GRAMM wallet first' };
   if (fromSymbol === toSymbol) return { error: 'Choose different tokens' };
   if (!Number.isFinite(numericAmount) || numericAmount < MIN_SWAP_AMOUNT) return { error: 'Enter a valid amount' };
 
@@ -504,14 +504,14 @@ async function buildStonFiTransaction({ from, to, amount, slippage = DEFAULT_SLI
   };
 
   let txParams;
-  if (fromSymbol === 'TON') {
+  if (fromSymbol === 'GRAMM') {
     txParams = await routerContract.getSwapTonToJettonTxParams({
       ...commonParams,
       proxyTon,
       askJettonAddress: toToken.address,
       askJettonWalletAddress: simulation.askJettonWallet
     });
-  } else if (toSymbol === 'TON') {
+  } else if (toSymbol === 'GRAMM') {
     txParams = await routerContract.getSwapJettonToTonTxParams({
       ...commonParams,
       offerJettonAddress: fromToken.address,
@@ -536,11 +536,11 @@ async function buildStonFiTransaction({ from, to, amount, slippage = DEFAULT_SLI
 }
 
 async function buildStonFiMultiHopQuote({ fromSymbol, toSymbol, amount, slippage }) {
-  const firstHop = await buildStonFiQuote({ from: fromSymbol, to: 'TON', amount, slippage });
+  const firstHop = await buildStonFiQuote({ from: fromSymbol, to: 'GRAMM', amount, slippage });
   if (firstHop.error) return firstHop;
 
   const secondHop = await buildStonFiQuote({
-    from: 'TON',
+    from: 'GRAMM',
     to: toSymbol,
     amount: firstHop.estimatedAmount,
     slippage
@@ -557,7 +557,7 @@ async function buildStonFiMultiHopQuote({ fromSymbol, toSymbol, amount, slippage
     feeAmount: secondHop.feeAmount,
     slippage,
     priceImpact: parseFloat((firstHop.priceImpact + secondHop.priceImpact).toFixed(4)),
-    route: [fromSymbol, 'TON', toSymbol],
+    route: [fromSymbol, 'GRAMM', toSymbol],
     provider: 'STON.fi',
     simulated: false,
     source: 'stonfi',
@@ -675,7 +675,7 @@ router.post('/swap/prepare', async (req, res) => {
   const walletAddress = req.body.walletAddress;
 
   if (!walletAddress) {
-    res.status(400).json({ ok: false, error: 'Connect TON wallet first' });
+    res.status(400).json({ ok: false, error: 'Connect GRAMM wallet first' });
     return;
   }
 
@@ -688,7 +688,7 @@ router.post('/swap/prepare', async (req, res) => {
           quote,
           provider,
           walletAddress,
-          nextStep: 'This quote uses multiple STON.fi hops. Execute direct TON/CASA swaps first or implement multi-message route execution.'
+          nextStep: 'This quote uses multiple STON.fi hops. Execute direct GRAMM/CASA swaps first or implement multi-message route execution.'
         },
         error: 'Multi-hop transaction builder is pending'
       });
@@ -741,7 +741,7 @@ router.post('/swap', (req, res) => {
   res.status(410).json({
     ok: false,
     code: 'SIMULATED_SWAP_REMOVED',
-    error: 'Simulated swap execution is disabled. Use /api/swap/prepare and sign the real TON Connect transaction.'
+    error: 'Simulated swap execution is disabled. Use /api/swap/prepare and sign the real GRAMM Connect transaction.'
   });
 });
 

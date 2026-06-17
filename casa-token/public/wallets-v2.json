@@ -410,7 +410,7 @@
   },
   {
     "app_name": "tonwallet",
-    "name": "TON Wallet",
+    "name": "GRAMM Wallet",
     "image": "https://wallet.ton.org/assets/ui/qr-logo.png",
     "about_url": "https://chrome.google.com/webstore/detail/ton-wallet/nphplpgoakhhjchkkhmiggakijnkhfnd",
     "bridge": [

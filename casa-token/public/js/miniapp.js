@@ -62,7 +62,7 @@
         }
         if (Date.now() - startedAt > 3000) {
           clearInterval(timer);
-          reject(new Error('TON Connect SDK не инициализировался.'));
+          reject(new Error('GRAMM Connect SDK не инициализировался.'));
         }
       }, 50);
     });
@@ -78,7 +78,7 @@
         script.src = url;
         script.async = true;
         script.onload = () => waitForTonConnectGlobal().then(resolve, reject);
-        script.onerror = () => reject(new Error('TON Connect SDK не загрузился.'));
+        script.onerror = () => reject(new Error('GRAMM Connect SDK не загрузился.'));
         document.head.appendChild(script);
       });
     }
@@ -102,7 +102,7 @@
     tonConnectInitPromise = (async () => {
     await loadTonConnectScript();
     if (!window.TON_CONNECT_UI?.TonConnectUI) {
-      throw new Error('TON Connect SDK не найден после загрузки.');
+      throw new Error('GRAMM Connect SDK не найден после загрузки.');
     }
 
     const connector = new window.TON_CONNECT_UI.TonConnect({
@@ -150,14 +150,14 @@
   async function openWallet() {
     const ui = await initTonConnect();
     if (!ui) return false;
-    setStatus('Открываем TON Connect...');
+    setStatus('Открываем GRAMM Connect...');
     try {
       ui.openModal().catch(error => {
-        setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
+        setStatus(error.message || 'Не удалось открыть GRAMM Connect.', 'error');
       });
       return true;
     } catch (error) {
-      setStatus(error.message || 'Не удалось открыть TON Connect.', 'error');
+      setStatus(error.message || 'Не удалось открыть GRAMM Connect.', 'error');
       return false;
     }
   }
@@ -172,7 +172,7 @@
     }
 
     const params = new URLSearchParams({
-      from: 'TON',
+      from: 'GRAMM',
       to: 'CASA',
       amount: String(amount),
       slippage: '0.5'
@@ -187,7 +187,7 @@
 
       const quote = payload.data;
       toAmountInput.value = Number(quote.estimatedAmount).toFixed(2);
-      quoteRate.textContent = '1 TON ≈ ' + formatAmount(quote.estimatedAmount / quote.amount, 'CASA');
+      quoteRate.textContent = '1 GRAMM ≈ ' + formatAmount(quote.estimatedAmount / quote.amount, 'CASA');
       quoteMinimum.textContent = formatAmount(quote.minimumReceived, 'CASA');
       quoteRoute.textContent = quote.route.join(' → ');
       setStatus('Котировка обновлена.');
@@ -218,7 +218,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          from: 'TON',
+          from: 'GRAMM',
           to: 'CASA',
           amount: Number(amountInput.value),
           slippage: 0.5,

@@ -73,7 +73,7 @@ async function sendStart(ctx) {
   const address = getCasaAddress();
   await ctx.replyWithHTML(
     '<b>CASA Token</b>\n\n' +
-    'Здесь можно проверить цену, статистику и перейти к покупке CASA через TON Connect.\n\n' +
+    'Здесь можно проверить цену, статистику и перейти к покупке CASA через GRAMM Connect.\n\n' +
     '<b>Контракт:</b> <code>' + address + '</code>',
     actionKeyboard()
   );
@@ -110,7 +110,7 @@ async function sendContract(ctx) {
   await ctx.replyWithHTML(
     '<b>Контракт CASA</b>\n\n' +
     '<code>' + address + '</code>\n\n' +
-    '<b>Сеть:</b> ' + (data.network || 'TON') + '\n' +
+    '<b>Сеть:</b> ' + (data.network || 'GRAMM') + '\n' +
     '<b>Стандарт:</b> ' + (data.standard || 'Jetton') + '\n' +
     '<b>Проверен:</b> ' + (data.verified ? 'да' : 'нет'),
     Markup.inlineKeyboard([
@@ -134,7 +134,7 @@ function createBot() {
   bot.command('buy', async (ctx) => {
     await ctx.replyWithHTML(
       '<b>Покупка CASA</b>\n\n' +
-      'Нажмите кнопку ниже, подключите TON-кошелек и подтвердите обмен на сайте.',
+      'Нажмите кнопку ниже, подключите GRAMM-кошелек и подтвердите обмен на сайте.',
       actionKeyboard()
     );
   });
