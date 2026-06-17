@@ -12,6 +12,11 @@ const priceEngine = require('./priceEngine');
 const { attachTelegramBot } = require('./bot');
 
 const app = express();
+const PRODUCTION_PUBLIC_URL = 'https://www.casafond.com';
+
+function isLocalhostUrl(url) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
+}
 
 app.disable('x-powered-by');
 app.set('trust proxy', true);
@@ -40,9 +45,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 function getPublicOrigin(req) {
-  return (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`)
+  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`)
     .replace(/\/$/, '')
     .replace('https://casafond.com', 'https://www.casafond.com');
+  if (process.env.NODE_ENV === 'production' && isLocalhostUrl(origin)) {
+    return PRODUCTION_PUBLIC_URL;
+  }
+  return origin;
 }
 
 function sendTonConnectManifest(req, res, name, urlPath = '') {
@@ -71,7 +80,7 @@ app.get('/tonconnect-miniapp-manifest.json', (req, res) => {
 
 app.get('/api/dapp/config', (req, res) => {
   const origin = getPublicOrigin(req);
-  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(origin);
+  const isLocalhost = isLocalhostUrl(origin);
   const isHttps = origin.startsWith('https://');
 
   res.json({

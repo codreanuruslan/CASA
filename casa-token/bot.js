@@ -1,24 +1,30 @@
 const { Telegraf, Markup } = require('telegraf');
 
 const DEFAULT_CASA_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
+const PRODUCTION_PUBLIC_URL = 'https://www.casafond.com';
+
+function isLocalhostUrl(url) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
+}
 
 function getPublicUrl() {
   const url = (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production' && isLocalhostUrl(url)) {
+    return PRODUCTION_PUBLIC_URL;
+  }
   return url === 'https://casafond.com' ? 'https://www.casafond.com' : url;
 }
 
 function getTelegramAppUrl() {
   const url = getPublicUrl();
-  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
-  if (isLocalhost || !url.startsWith('https://')) {
-    return 'https://www.casafond.com';
+  if (isLocalhostUrl(url) || !url.startsWith('https://')) {
+    return PRODUCTION_PUBLIC_URL;
   }
   return url;
 }
 
 function isHttpsPublicUrl(url) {
-  return url.startsWith('https://') &&
-    !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
+  return url.startsWith('https://') && !isLocalhostUrl(url);
 }
 
 function getCasaAddress() {
