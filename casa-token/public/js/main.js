@@ -200,8 +200,8 @@
     let tonConnectScriptPromise = null;
     let dappConfigPromise = null;
     const tonConnectScriptUrls = [
-        '/vendor/tonconnect-ui.min.js?v=2.4.4',
-        'https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js'
+        '/vendor/tonconnect-ui.min.js?v=3.0.0',
+        'https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js'
     ];
 
     function waitForTonConnectGlobal() {
