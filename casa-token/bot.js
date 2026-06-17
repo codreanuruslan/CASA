@@ -7,6 +7,15 @@ function getPublicUrl() {
   return url === 'https://casafond.com' ? 'https://www.casafond.com' : url;
 }
 
+function getTelegramAppUrl() {
+  const url = getPublicUrl();
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
+  if (isLocalhost || !url.startsWith('https://')) {
+    return 'https://www.casafond.com';
+  }
+  return url;
+}
+
 function getCasaAddress() {
   return process.env.CASA_JETTON_ADDRESS || process.env.CONTRACT_ADDRESS || DEFAULT_CASA_ADDRESS;
 }
@@ -52,12 +61,10 @@ async function readApi(path) {
 }
 
 function actionKeyboard() {
-  const siteUrl = getPublicUrl();
+  const siteUrl = getTelegramAppUrl();
   const swapUrl = siteUrl + '/miniapp';
   const address = getCasaAddress();
-  const buyButton = siteUrl.startsWith('https://')
-    ? Markup.button.webApp('Купить CASA', swapUrl)
-    : Markup.button.url('Купить CASA', swapUrl);
+  const buyButton = Markup.button.webApp('Купить CASA', swapUrl);
 
   return Markup.inlineKeyboard([
     [buyButton],
@@ -116,9 +123,7 @@ async function sendContract(ctx) {
     Markup.inlineKeyboard([
       [Markup.button.url('Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
       [
-        getPublicUrl().startsWith('https://')
-          ? Markup.button.webApp('Купить CASA', getPublicUrl() + '/miniapp')
-          : Markup.button.url('Купить CASA', getPublicUrl() + '/miniapp')
+        Markup.button.webApp('Купить CASA', getTelegramAppUrl() + '/miniapp')
       ]
     ])
   );
@@ -126,7 +131,10 @@ async function sendContract(ctx) {
 
 function createBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return null;
+  if (!token) {
+    console.warn('Telegram bot disabled: TELEGRAM_BOT_TOKEN is not configured.');
+    return null;
+  }
 
   const bot = new Telegraf(token);
 
@@ -157,7 +165,10 @@ function createBot() {
 
   bot.catch((error, ctx) => {
     console.error('Telegram bot error', error);
-    if (ctx?.reply) ctx.reply('Временная ошибка бота. Попробуйте еще раз.').catch(() => {});
+    const message = process.env.NODE_ENV === 'production'
+      ? 'Временная ошибка бота. Попробуйте еще раз.'
+      : 'Ошибка бота: ' + (error?.description || error?.message || 'unknown');
+    if (ctx?.reply) ctx.reply(message).catch(() => {});
   });
 
   return bot;
@@ -171,6 +182,7 @@ function attachTelegramBot(app) {
   const adminSecret = process.env.TELEGRAM_ADMIN_SECRET;
   const webhookPath = '/telegram/webhook/' + webhookSecret;
   const isProduction = process.env.NODE_ENV === 'production';
+  const pollingEnabled = process.env.TELEGRAM_BOT_POLLING === 'true';
 
   function hasAdminAccess(req) {
     if (!adminSecret) return !isProduction;
@@ -237,6 +249,20 @@ function attachTelegramBot(app) {
       }
     });
   });
+
+  if (pollingEnabled) {
+    bot.launch()
+      .then(() => console.log('Telegram bot polling started.'))
+      .catch(error => console.error('Telegram bot polling failed', error));
+
+    const stop = signal => {
+      bot.stop(signal);
+      process.exit(0);
+    };
+
+    process.once('SIGINT', () => stop('SIGINT'));
+    process.once('SIGTERM', () => stop('SIGTERM'));
+  }
 
   return { bot, webhookPath };
 }
