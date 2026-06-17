@@ -16,6 +16,11 @@ function getTelegramAppUrl() {
   return url;
 }
 
+function isHttpsPublicUrl(url) {
+  return url.startsWith('https://') &&
+    !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
+}
+
 function getCasaAddress() {
   return process.env.CASA_JETTON_ADDRESS || process.env.CONTRACT_ADDRESS || DEFAULT_CASA_ADDRESS;
 }
@@ -183,6 +188,7 @@ function attachTelegramBot(app) {
   const webhookPath = '/telegram/webhook/' + webhookSecret;
   const isProduction = process.env.NODE_ENV === 'production';
   const pollingEnabled = process.env.TELEGRAM_BOT_POLLING === 'true';
+  const webhookUrl = getPublicUrl() + webhookPath;
 
   function hasAdminAccess(req) {
     if (!adminSecret) return !isProduction;
@@ -205,7 +211,6 @@ function attachTelegramBot(app) {
       return;
     }
 
-    const webhookUrl = getPublicUrl() + webhookPath;
     const result = await bot.telegram.setWebhook(webhookUrl);
     res.json({ ok: true, data: { webhookUrl, result } });
   });
@@ -226,7 +231,6 @@ function attachTelegramBot(app) {
       return;
     }
 
-    const webhookUrl = getPublicUrl() + webhookPath;
     const [me, info] = await Promise.all([
       bot.telegram.getMe(),
       bot.telegram.getWebhookInfo()
@@ -262,6 +266,12 @@ function attachTelegramBot(app) {
 
     process.once('SIGINT', () => stop('SIGINT'));
     process.once('SIGTERM', () => stop('SIGTERM'));
+  } else if (isHttpsPublicUrl(getPublicUrl())) {
+    bot.telegram.setWebhook(webhookUrl)
+      .then(() => console.log('Telegram webhook configured:', webhookUrl))
+      .catch(error => console.error('Telegram webhook setup failed', error));
+  } else {
+    console.warn('Telegram webhook was not configured: PUBLIC_URL must be a public HTTPS URL or TELEGRAM_BOT_POLLING must be true.');
   }
 
   return { bot, webhookPath };
