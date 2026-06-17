@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '.env'), override: true });
 
 const indexRouter = require('./routes');
 const apiRouter = require('./routes/api');
