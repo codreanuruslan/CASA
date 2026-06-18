@@ -18,6 +18,14 @@ function isLocalhostUrl(url) {
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
 }
 
+function normalizePublicUrl(url) {
+  return url
+    .replace(/\/$/, '')
+    .replace('https://casafond.com', PRODUCTION_PUBLIC_URL)
+    .replace('http://casafond.com', PRODUCTION_PUBLIC_URL)
+    .replace('http://www.casafond.com', PRODUCTION_PUBLIC_URL);
+}
+
 app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(helmet({
@@ -45,9 +53,15 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 function getPublicOrigin(req) {
-  const origin = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`)
-    .replace(/\/$/, '')
-    .replace('https://casafond.com', 'https://www.casafond.com');
+  const requestHost = req.get('host') || '';
+  const requestOrigin = requestHost.includes('casafond.com')
+    ? PRODUCTION_PUBLIC_URL
+    : `${req.protocol}://${requestHost}`;
+  const configuredOrigin = process.env.PUBLIC_URL ? normalizePublicUrl(process.env.PUBLIC_URL) : '';
+  const origin = !configuredOrigin || isLocalhostUrl(configuredOrigin)
+    ? normalizePublicUrl(requestOrigin)
+    : configuredOrigin;
+
   if (process.env.NODE_ENV === 'production' && isLocalhostUrl(origin)) {
     return PRODUCTION_PUBLIC_URL;
   }

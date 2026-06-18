@@ -9,7 +9,10 @@ function isLocalhostUrl(url) {
 
 function getPublicUrl() {
   const url = (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
-  if (process.env.NODE_ENV === 'production' && isLocalhostUrl(url)) {
+  if (
+    isLocalhostUrl(url) &&
+    (process.env.NODE_ENV === 'production' || process.env.TELEGRAM_BOT_POLLING !== 'true')
+  ) {
     return PRODUCTION_PUBLIC_URL;
   }
   return url === 'https://casafond.com' ? 'https://www.casafond.com' : url;
