@@ -29,7 +29,7 @@ const chainTonClient = new TonClient({
 const CASA_JETTON_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 
 const TOKEN_META = {
-  network: 'GRAMM',
+  network: 'TON',
   standard: 'Jetton (TEP-74)',
   decimals: 9
 };
@@ -71,15 +71,24 @@ router.get('/health', (req, res) => {
 
 router.get('/token', async (req, res) => {
   const tokenData = await getCasaTokenData().catch(() => ({ totalSupply: null }));
+  const metadata = tokenData.metadata || {};
   res.json({
     ok: true,
     data: {
-      name: 'CASA Token',
-      ticker: 'CASA',
+      name: metadata.name || 'CASA',
+      ticker: metadata.symbol || 'CASA',
+      symbol: metadata.symbol || 'CASA',
+      description: metadata.description || null,
+      image: metadata.image || null,
       network: TOKEN_META.network,
       standard: TOKEN_META.standard,
+      decimals: tokenData.decimals || TOKEN_META.decimals,
       totalSupply: tokenData.totalSupply,
-      contract: process.env.CONTRACT_ADDRESS || CASA_JETTON_ADDRESS
+      holders: tokenData.holders || null,
+      mintable: tokenData.mintable ?? null,
+      verification: tokenData.verification || null,
+      verified: ['whitelist', 'verified'].includes(tokenData.verification),
+      contract: getToken('CASA').address
     }
   });
 });
@@ -155,15 +164,26 @@ router.get('/tokenomics', async (req, res) => {
   });
 });
 
-router.get('/contract', (req, res) => {
+router.get('/contract', async (req, res) => {
+  const tokenData = await getCasaTokenData().catch(error => ({
+    verification: null,
+    warning: error.message
+  }));
+  const verification = tokenData.verification || null;
+
   res.json({
     ok: true,
     data: {
-      address: process.env.CONTRACT_ADDRESS || CASA_JETTON_ADDRESS,
+      address: getToken('CASA').address,
       network: TOKEN_META.network,
       standard: TOKEN_META.standard,
-      verified: true,
-      auditUrl: 'https://github.com/casa-token/audit'
+      decimals: tokenData.decimals || TOKEN_META.decimals,
+      mintable: tokenData.mintable ?? null,
+      verification,
+      verified: ['whitelist', 'verified'].includes(verification),
+      auditUrl: process.env.CASA_AUDIT_URL || null,
+      source: tokenData.source || null,
+      warning: tokenData.warning || null
     }
   });
 });
@@ -222,11 +242,14 @@ async function getCasaTokenData() {
     const data = await fetchJson(`https://tonapi.io/v2/jettons/${encodeURIComponent(casaAddress)}`);
     const decimals = parseInt(data.metadata?.decimals, 10) || TOKEN_META.decimals;
     return {
+      address: casaAddress,
       totalSupply: unitsToDecimal(data.total_supply || '0', decimals),
       holders: numberOrNull(data.holders_count),
       decimals,
       mintable: Boolean(data.mintable),
       verification: data.verification || null,
+      metadata: data.metadata || {},
+      adminAddress: data.admin?.address || null,
       source: 'tonapi'
     };
   } catch (tonApiError) {
@@ -234,11 +257,14 @@ async function getCasaTokenData() {
     const data = await master.getJettonData();
     const decimals = TOKEN_META.decimals;
     return {
+      address: casaAddress,
       totalSupply: unitsToDecimal(data.totalSupply.toString(), decimals),
       holders: null,
       decimals,
       mintable: Boolean(data.mintable),
       verification: null,
+      metadata: {},
+      adminAddress: null,
       source: 'toncenter',
       warning: tonApiError.message
     };
@@ -611,7 +637,11 @@ async function getCasaPrice() {
 }
 
 router.get('/swap/tokens', (req, res) => {
-  res.json({ ok: true, data: Object.keys(SWAP_TOKENS).map(getToken) });
+  const tokens = Object.keys(SWAP_TOKENS).map(symbol => {
+    const token = getToken(symbol);
+    return symbol === 'GRAMM' ? { ...token, symbol: 'TON' } : token;
+  });
+  res.json({ ok: true, data: tokens });
 });
 
 router.get('/swap/config', (req, res) => {
@@ -688,7 +718,7 @@ router.post('/swap/prepare', async (req, res) => {
           quote,
           provider,
           walletAddress,
-          nextStep: 'This quote uses multiple STON.fi hops. Execute direct GRAMM/CASA swaps first or implement multi-message route execution.'
+          nextStep: 'This quote uses multiple STON.fi hops. Execute direct TON/CASA swaps first or implement multi-message route execution.'
         },
         error: 'Multi-hop transaction builder is pending'
       });

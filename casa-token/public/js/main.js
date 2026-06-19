@@ -403,8 +403,13 @@
     function formatTokenAmount(value, symbol) {
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) return '-';
+        const displaySymbol = symbol === 'GRAMM' ? 'TON' : symbol;
         const decimals = symbol === 'CASA' ? 2 : 6;
-        return numeric.toLocaleString('ru-RU', { maximumFractionDigits: decimals }) + ' ' + symbol;
+        return numeric.toLocaleString('ru-RU', { maximumFractionDigits: decimals }) + ' ' + displaySymbol;
+    }
+
+    function displayTokenSymbol(symbol) {
+        return symbol === 'GRAMM' ? 'TON' : symbol;
     }
 
     function setSwapStatus(message, type = '') {
@@ -439,12 +444,12 @@
 
             latestQuote = payload.data;
             swapToAmount.value = Number(latestQuote.estimatedAmount).toFixed(swapToToken.value === 'CASA' ? 2 : 6);
-            quoteRate.textContent = '1 ' + latestQuote.from + ' ≈ ' +
+            quoteRate.textContent = '1 ' + displayTokenSymbol(latestQuote.from) + ' ≈ ' +
                 formatTokenAmount(latestQuote.estimatedAmount / latestQuote.amount, latestQuote.to);
             quoteMinimum.textContent = formatTokenAmount(latestQuote.minimumReceived, latestQuote.to);
             quoteFee.textContent = formatTokenAmount(latestQuote.feeAmount, latestQuote.to);
             quoteImpact.textContent = latestQuote.priceImpact.toFixed(2) + '%';
-            quoteRoute.textContent = latestQuote.route.join(' → ');
+            quoteRoute.textContent = latestQuote.route.map(displayTokenSymbol).join(' → ');
             setSwapStatus('Котировка обновлена.');
         } catch (error) {
             latestQuote = null;
@@ -736,4 +741,4 @@
             : 'rgba(7, 12, 24, 0.70)';
     });
 
-    console.log('🏠 CASA Token — Built on GRAMM Blockchain');
+    console.log('🏠 CASA Token — Built on TON Blockchain');

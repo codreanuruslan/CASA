@@ -31,7 +31,12 @@
   function formatAmount(value, symbol) {
     const number = Number(value);
     if (!Number.isFinite(number)) return '-';
-    return number.toLocaleString('ru-RU', { maximumFractionDigits: symbol === 'CASA' ? 2 : 6 }) + ' ' + symbol;
+    const displaySymbol = symbol === 'GRAMM' ? 'TON' : symbol;
+    return number.toLocaleString('ru-RU', { maximumFractionDigits: symbol === 'CASA' ? 2 : 6 }) + ' ' + displaySymbol;
+  }
+
+  function displayTokenSymbol(symbol) {
+    return symbol === 'GRAMM' ? 'TON' : symbol;
   }
 
   function createScopedStorage(scope) {
@@ -187,9 +192,9 @@
 
       const quote = payload.data;
       toAmountInput.value = Number(quote.estimatedAmount).toFixed(2);
-      quoteRate.textContent = '1 GRAMM ≈ ' + formatAmount(quote.estimatedAmount / quote.amount, 'CASA');
+      quoteRate.textContent = '1 TON ≈ ' + formatAmount(quote.estimatedAmount / quote.amount, 'CASA');
       quoteMinimum.textContent = formatAmount(quote.minimumReceived, 'CASA');
-      quoteRoute.textContent = quote.route.join(' → ');
+      quoteRoute.textContent = quote.route.map(displayTokenSymbol).join(' → ');
       setStatus('Котировка обновлена.');
     } catch (error) {
       setStatus(error.message, 'error');
