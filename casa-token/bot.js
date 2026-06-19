@@ -73,32 +73,84 @@ async function readApi(path) {
 function mainKeyboard() {
   const siteUrl = getTelegramAppUrl();
   return Markup.inlineKeyboard([
-    [Markup.button.webApp('🛒 Купить CASA', siteUrl + '/miniapp')],
+    [Markup.button.webApp('🚀 Купить CASA', siteUrl + '/miniapp')],
     [
-      Markup.button.callback('💵 Цена', 'price'),
-      Markup.button.callback('📊 Статистика', 'stats')
+      Markup.button.callback('💎 Цена CASA', 'price'),
+      Markup.button.callback('📈 Статистика', 'stats')
     ],
     [
-      Markup.button.callback('📋 Контракт', 'contract'),
-      Markup.button.url('🌐 Сайт', siteUrl)
+      Markup.button.callback('📜 Контракт', 'contract'),
+      Markup.button.callback('👛 Баланс', 'balance_menu')
     ],
     [
-      Markup.button.callback('🔔 Алерт на цену', 'alert_menu'),
-      Markup.button.callback('👛 Мой баланс', 'balance_menu')
+      Markup.button.callback('🔔 Алерт цены', 'alert_menu'),
+      Markup.button.callback('🤝 Рефералка', 'referral')
     ],
-    [Markup.button.callback('👥 Реферальная ссылка', 'referral')]
+    [
+      Markup.button.url('🌐 Открыть сайт', siteUrl),
+      Markup.button.callback('❓ Помощь', 'help')
+    ]
   ]);
 }
 
-function backKeyboard() {
-  return Markup.inlineKeyboard([[Markup.button.callback('← Назад', 'start')]]);
+function backKeyboard(label = '⬅️ В меню') {
+  return Markup.inlineKeyboard([[Markup.button.callback(label, 'start')]]);
+}
+
+function buyBackKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.webApp('🚀 Купить CASA', getTelegramAppUrl() + '/miniapp')],
+    [Markup.button.callback('⬅️ В меню', 'start')]
+  ]);
 }
 
 async function replyOrEdit(ctx, text, keyboard) {
   if (ctx.callbackQuery) {
-    return ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
+    try {
+      return await ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
+    } catch (error) {
+      if (error?.description?.includes('message is not modified')) return null;
+      return ctx.replyWithHTML(text, keyboard);
+    }
   }
   return ctx.replyWithHTML(text, keyboard);
+}
+
+async function setBotCommands(bot) {
+  await bot.telegram.setMyCommands([
+    { command: 'start', description: 'Главное меню' },
+    { command: 'menu', description: 'Главное меню' },
+    { command: 'buy', description: 'Купить CASA' },
+    { command: 'price', description: 'Текущая цена' },
+    { command: 'stats', description: 'Статистика токена' },
+    { command: 'contract', description: 'Контракт CASA' },
+    { command: 'alerts', description: 'Мой алерт цены' },
+    { command: 'cancelalert', description: 'Отменить алерт' },
+    { command: 'balance', description: 'Проверить баланс CASA' },
+    { command: 'referral', description: 'Реферальная ссылка' }
+  ]);
+}
+
+function helpText() {
+  return (
+    '📖 <b>Доступные команды</b>\n\n' +
+    '/start — главное меню\n' +
+    '/menu — главное меню\n' +
+    '/price — текущая цена\n' +
+    '/stats — статистика токена\n' +
+    '/contract — информация о контракте\n' +
+    '/buy — купить CASA\n' +
+    '/alert 0.05 above — алерт на рост цены\n' +
+    '/alert 0.03 below — алерт на падение цены\n' +
+    '/alerts — мой алерт\n' +
+    '/cancelalert — отменить алерт\n' +
+    '/balance UQ... — баланс CASA на кошельке\n' +
+    '/referral — реферальная ссылка'
+  );
+}
+
+async function sendHelp(ctx) {
+  await replyOrEdit(ctx, helpText(), backKeyboard());
 }
 
 async function sendStart(ctx) {
@@ -178,8 +230,8 @@ async function sendContract(ctx) {
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.url('🔍 Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
-      [Markup.button.webApp('🛒 Купить CASA', getTelegramAppUrl() + '/miniapp')],
-      [Markup.button.callback('← Назад', 'start')]
+      [Markup.button.webApp('🚀 Купить CASA', getTelegramAppUrl() + '/miniapp')],
+      [Markup.button.callback('⬅️ В меню', 'start')]
     ]);
 
     await replyOrEdit(ctx, text, keyboard);
@@ -197,10 +249,28 @@ async function sendAlertMenu(ctx) {
     : '🔔 <b>Алерт на цену</b>\n\nВведите команду:\n\n<code>/alert 0.05 above</code> — уведомить, когда цена вырастет выше $0.05\n<code>/alert 0.03 below</code> — уведомить, когда цена упадёт ниже $0.03';
 
   const buttons = existing
-    ? [[Markup.button.callback('❌ Отменить алерт', 'alert_cancel')], [Markup.button.callback('← Назад', 'start')]]
-    : [[Markup.button.callback('← Назад', 'start')]];
+    ? [
+        [Markup.button.callback('🗑 Отменить алерт', 'alert_cancel')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ]
+    : [
+        [Markup.button.callback('💎 Проверить цену', 'price')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ];
 
   await replyOrEdit(ctx, text, Markup.inlineKeyboard(buttons));
+}
+
+async function cancelAlert(ctx) {
+  await botStore.deletePriceAlert(ctx.chat.id);
+  const text = '✅ Алерт отменён.';
+
+  if (ctx.callbackQuery) {
+    await replyOrEdit(ctx, text, backKeyboard());
+    return;
+  }
+
+  await ctx.replyWithHTML(text, backKeyboard());
 }
 
 async function sendBalanceMenu(ctx) {
@@ -209,7 +279,10 @@ async function sendBalanceMenu(ctx) {
     'Введите TON-адрес кошелька командой:\n\n' +
     '<code>/balance UQ...</code>';
 
-  await replyOrEdit(ctx, text, backKeyboard());
+  await replyOrEdit(ctx, text, Markup.inlineKeyboard([
+    [Markup.button.callback('💎 Цена CASA', 'price'), Markup.button.callback('📈 Статистика', 'stats')],
+    [Markup.button.callback('⬅️ В меню', 'start')]
+  ]));
 }
 
 async function checkBalance(ctx) {
@@ -251,6 +324,7 @@ async function sendReferral(ctx) {
   const chatId = ctx.from.id;
   const botUsername = ctx.botInfo?.username || 'casafond_bot';
   const refLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
+  const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(refLink);
   const count = await botStore.countReferrals(chatId);
 
   const text =
@@ -260,7 +334,10 @@ async function sendReferral(ctx) {
     '<code>' + refLink + '</code>\n\n' +
     '👤 Привлечено рефералов: <b>' + count + '</b>';
 
-  await replyOrEdit(ctx, text, backKeyboard());
+  await replyOrEdit(ctx, text, Markup.inlineKeyboard([
+    [Markup.button.url('📤 Поделиться ссылкой', shareUrl)],
+    [Markup.button.callback('⬅️ В меню', 'start')]
+  ]));
 }
 
 async function checkPriceAlerts(bot) {
@@ -307,19 +384,19 @@ function createBot() {
   const bot = new Telegraf(token);
 
   bot.start(sendStart);
+  bot.command('menu', sendStart);
   bot.command('price', sendPrice);
   bot.command('stats', sendStats);
   bot.command('contract', sendContract);
   bot.command('balance', checkBalance);
   bot.command('referral', sendReferral);
+  bot.command('alerts', sendAlertMenu);
+  bot.command('cancelalert', cancelAlert);
 
   bot.command('buy', async (ctx) => {
     await ctx.replyWithHTML(
       '🛒 <b>Покупка CASA</b>\n\nНажмите кнопку, подключите TON-кошелёк и подтвердите обмен.',
-      Markup.inlineKeyboard([
-        [Markup.button.webApp('🛒 Купить CASA', getTelegramAppUrl() + '/miniapp')],
-        [Markup.button.callback('← Назад', 'start')]
-      ])
+      buyBackKeyboard()
     );
   });
 
@@ -338,21 +415,7 @@ function createBot() {
     await ctx.replyWithHTML(`🔔 Алерт установлен!\n\nУведомлю вас, когда CASA <b>${directionText} $${price}</b>.`, backKeyboard());
   });
 
-  bot.help(async (ctx) => {
-    await ctx.replyWithHTML(
-      '📖 <b>Доступные команды</b>\n\n' +
-      '/start — главное меню\n' +
-      '/price — текущая цена\n' +
-      '/stats — статистика токена\n' +
-      '/contract — информация о контракте\n' +
-      '/buy — купить CASA\n' +
-      '/alert 0.05 above — алерт на рост цены\n' +
-      '/alert 0.03 below — алерт на падение цены\n' +
-      '/balance UQ... — баланс CASA на кошельке\n' +
-      '/referral — реферальная ссылка',
-      backKeyboard()
-    );
-  });
+  bot.help(sendHelp);
 
   bot.action('start', async (ctx) => {
     await ctx.answerCbQuery();
@@ -382,10 +445,13 @@ function createBot() {
     await ctx.answerCbQuery();
     await sendReferral(ctx);
   });
+  bot.action('help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendHelp(ctx);
+  });
   bot.action('alert_cancel', async (ctx) => {
     await ctx.answerCbQuery();
-    await botStore.deletePriceAlert(ctx.chat.id);
-    await ctx.editMessageText('✅ Алерт отменён.', { parse_mode: 'HTML', ...backKeyboard() });
+    await cancelAlert(ctx);
   });
 
   bot.catch((error, ctx) => {
@@ -410,6 +476,8 @@ function attachTelegramBot(app) {
   const isProduction = process.env.NODE_ENV === 'production';
   const pollingEnabled = process.env.TELEGRAM_BOT_POLLING === 'true';
   const webhookUrl = getPublicUrl() + webhookPath;
+
+  setBotCommands(bot).catch(error => console.error('Telegram command setup failed', error));
 
   function hasAdminAccess(req) {
     if (!adminSecret) return !isProduction;

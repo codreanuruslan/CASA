@@ -8,7 +8,7 @@ The CASA Telegram bot is implemented in `casa-token/bot.js`. Persistent bot stat
 
 ## Features
 
-- Main menu with inline buttons.
+- Main menu with inline buttons for buy, price, stats, contract, balance, alerts, referrals, site link, and help.
 - Telegram Mini App purchase button.
 - Price, stats, and contract commands.
 - Price alerts with periodic checks.
@@ -21,15 +21,20 @@ The CASA Telegram bot is implemented in `casa-token/bot.js`. Persistent bot stat
 
 ```text
 /start              Open the main menu
+/menu               Open the main menu
 /buy                Open the CASA Mini App purchase flow
 /price              Show current CASA price
 /stats              Show token statistics
 /contract           Show CASA contract metadata and Tonviewer link
 /alert 0.05 above   Notify when CASA rises above $0.05
 /alert 0.03 below   Notify when CASA falls below $0.03
+/alerts             Show the active price alert
+/cancelalert        Cancel the active price alert
 /balance UQ...      Show CASA balance for a TON wallet address
 /referral           Generate a personal referral link
 ```
+
+The bot also publishes this command list to Telegram via `setMyCommands` during startup. If command setup fails, the bot still runs and logs `Telegram command setup failed`.
 
 ## Webhook mode
 

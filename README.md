@@ -7,7 +7,7 @@ CASA Token is a Node.js/Express web app for the CASA landing page, token API, TO
 - CASA landing page with token information, tokenomics, roadmap, FAQ, and community links.
 - Express API for price, stats, contract metadata, swap quotes, and dApp configuration.
 - TON Connect manifest endpoints for the main site and Telegram Mini App.
-- Telegram bot powered by Telegraf with menu buttons, `/start`, `/buy`, `/price`, `/stats`, `/contract`, `/alert`, `/balance`, and `/referral`.
+- Telegram bot powered by Telegraf with menu buttons, `/start`, `/menu`, `/buy`, `/price`, `/stats`, `/contract`, `/alert`, `/alerts`, `/cancelalert`, `/balance`, and `/referral`.
 - Webhook-first Telegram bot setup for production deployments.
 - Optional PostgreSQL persistence for Telegram bot price alerts and referrals.
 
@@ -219,17 +219,20 @@ Use these fields first when debugging Telegram delivery.
 
 ```text
 /start              Open the main bot menu
+/menu               Open the main bot menu
 /buy                Open the CASA Mini App purchase flow
 /price              Show current CASA price
 /stats              Show token stats
 /contract           Show CASA contract metadata and Tonviewer link
 /alert 0.05 above   Notify when CASA price rises above $0.05
 /alert 0.03 below   Notify when CASA price falls below $0.03
+/alerts             Show the active price alert
+/cancelalert        Cancel the active price alert
 /balance UQ...      Show CASA balance for a TON wallet address
 /referral           Generate a personal referral link
 ```
 
-Bot menu buttons mirror the same flows: buy, price, stats, contract, price alert, balance, and referral link.
+Bot menu buttons mirror the same flows with quick actions for buy, price, stats, contract, balance, alerts, referral sharing, site link, and help.
 
 ## Telegram Bot Database
 
