@@ -7,9 +7,9 @@ CASA Token is a Node.js/Express web app for the CASA landing page, token API, TO
 - CASA landing page with token information, tokenomics, roadmap, FAQ, and community links.
 - Express API for price, stats, contract metadata, swap quotes, and dApp configuration.
 - TON Connect manifest endpoints for the main site and Telegram Mini App.
-- Telegram bot powered by Telegraf with menu buttons, `/start`, `/menu`, `/buy`, `/price`, `/stats`, `/contract`, `/alert`, `/alerts`, `/cancelalert`, `/balance`, and `/referral`.
+- Telegram bot powered by Telegraf with menu buttons, `/start`, `/menu`, `/buy`, `/price`, `/stats`, `/chart`, `/top`, `/whale`, `/news`, `/contract`, `/alert`, `/alerts`, `/cancelalert`, `/balance`, and `/referral`.
 - Webhook-first Telegram bot setup for production deployments.
-- Optional PostgreSQL persistence for Telegram bot price alerts and referrals.
+- Optional PostgreSQL persistence for Telegram bot price alerts, referrals, subscriptions, and whale deduplication.
 
 ## Project Structure
 
@@ -98,6 +98,7 @@ TELEGRAM_ADMIN_SECRET=change-this-admin-secret
 
 DATABASE_URL=
 DATABASE_SSL=
+WHALE_THRESHOLD_USD=1000
 ```
 
 Variable notes:
@@ -107,6 +108,7 @@ PUBLIC_URL             Public site origin. Must be HTTPS in production.
 TELEGRAM_BOT_POLLING   Use true only for local development. Use false for production webhooks.
 DATABASE_URL           PostgreSQL connection string for bot alerts/referrals.
 DATABASE_SSL           Set false for local PostgreSQL without TLS. Production usually uses true or leave empty for auto.
+WHALE_THRESHOLD_USD    Minimum USD value for Telegram whale alerts.
 DEX_PROVIDER           stonfi or demo.
 ```
 
@@ -223,6 +225,10 @@ Use these fields first when debugging Telegram delivery.
 /buy                Open the CASA Mini App purchase flow
 /price              Show current CASA price
 /stats              Show token stats
+/chart              Show CASA price chart
+/top                Show top CASA holders
+/whale              Subscribe to large CASA transfer alerts
+/news               Subscribe to CASA news broadcasts
 /contract           Show CASA contract metadata and Tonviewer link
 /alert 0.05 above   Notify when CASA price rises above $0.05
 /alert 0.03 below   Notify when CASA price falls below $0.03
@@ -232,18 +238,20 @@ Use these fields first when debugging Telegram delivery.
 /referral           Generate a personal referral link
 ```
 
-Bot menu buttons mirror the same flows with quick actions for buy, price, stats, contract, balance, alerts, referral sharing, site link, and help.
+Bot menu buttons mirror the same flows with quick actions for buy, price, stats, chart, top holders, contract, balance, alerts, whale alerts, news, referral sharing, site link, and help.
 
 ## Telegram Bot Database
 
-Set `DATABASE_URL` to persist bot price alerts and referral records across restarts. The app creates these tables automatically on startup:
+Set `DATABASE_URL` to persist bot price alerts, referral records, subscriptions, and whale deduplication across restarts. The app creates these tables automatically on startup:
 
 ```text
 bot_price_alerts
 bot_referrals
+bot_subscriptions
+bot_seen_whales
 ```
 
-If `DATABASE_URL` is not set, the bot uses an in-memory fallback for local development. In that mode alerts and referrals reset when the server restarts.
+If `DATABASE_URL` is not set, the bot uses an in-memory fallback for local development. In that mode alerts, referrals, subscriptions, and whale deduplication reset when the server restarts.
 
 Tables created by the app:
 
@@ -259,6 +267,18 @@ CREATE TABLE IF NOT EXISTS bot_price_alerts (
 CREATE TABLE IF NOT EXISTS bot_referrals (
   referred_chat_id BIGINT PRIMARY KEY,
   referrer_chat_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS bot_subscriptions (
+  chat_id BIGINT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('whale', 'news')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (chat_id, type)
+);
+
+CREATE TABLE IF NOT EXISTS bot_seen_whales (
+  tx_id TEXT PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
@@ -289,6 +309,7 @@ GET /api/swap/tokens
 GET /api/swap/config
 GET /api/swap/quote
 POST /api/swap/prepare
+POST /api/telegram/broadcast-news?secret=TELEGRAM_ADMIN_SECRET
 GET /tonconnect-site-manifest.json
 GET /tonconnect-miniapp-manifest.json
 GET /miniapp

@@ -8,14 +8,14 @@ The CASA Telegram bot is implemented in `casa-token/bot.js`. Persistent bot stat
 
 ## Features
 
-- Main menu with inline buttons for buy, price, stats, contract, balance, alerts, referrals, site link, and help.
+- Main menu with inline buttons for buy, price, stats, chart, top holders, contract, balance, alerts, whale alerts, news, referrals, site link, and help.
 - Telegram Mini App purchase button.
-- Price, stats, and contract commands.
+- Price, stats, chart, top holders, whale alerts, news, and contract commands.
 - Price alerts with periodic checks.
 - CASA balance lookup by TON wallet address.
 - Referral links.
 - Webhook-first production setup.
-- PostgreSQL persistence for alerts and referrals.
+- PostgreSQL persistence for alerts, referrals, subscriptions, and whale deduplication.
 
 ## Commands
 
@@ -25,6 +25,10 @@ The CASA Telegram bot is implemented in `casa-token/bot.js`. Persistent bot stat
 /buy                Open the CASA Mini App purchase flow
 /price              Show current CASA price
 /stats              Show token statistics
+/chart              Show CASA price chart
+/top                Show top CASA holders
+/whale              Subscribe to large CASA transfer alerts
+/news               Subscribe to CASA news broadcasts
 /contract           Show CASA contract metadata and Tonviewer link
 /alert 0.05 above   Notify when CASA rises above $0.05
 /alert 0.03 below   Notify when CASA falls below $0.03
@@ -81,6 +85,7 @@ Set `DATABASE_URL` to store alerts and referrals in PostgreSQL:
 ```env
 DATABASE_URL=postgres://user:password@host:5432/database
 DATABASE_SSL=true
+WHALE_THRESHOLD_USD=1000
 ```
 
 The app creates:
@@ -88,9 +93,37 @@ The app creates:
 ```text
 bot_price_alerts
 bot_referrals
+bot_subscriptions
+bot_seen_whales
 ```
 
 If `DATABASE_URL` is not set, `botStore.js` uses memory fallback. This keeps local development simple but state resets on restart.
+
+## News broadcasts
+
+Admins can send a Telegram news broadcast to `/news` subscribers:
+
+```http
+POST /api/telegram/broadcast-news?secret=TELEGRAM_ADMIN_SECRET
+```
+
+Body:
+
+```json
+{
+  "title": "CASA update",
+  "text": "Short announcement text",
+  "url": "https://www.casafond.com"
+}
+```
+
+## Whale alerts
+
+The bot checks large CASA transfers every five minutes. The minimum USD value is configured by:
+
+```env
+WHALE_THRESHOLD_USD=1000
+```
 
 ## Alert checking
 

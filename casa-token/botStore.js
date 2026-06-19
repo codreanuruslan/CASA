@@ -1,5 +1,7 @@
 const memoryAlerts = new Map();
 const memoryReferrals = new Map();
+const memorySubscriptions = new Map();
+const memorySeenWhales = new Set();
 let pool = null;
 let initPromise = null;
 let usingDatabase = false;
@@ -45,6 +47,22 @@ async function initBotStore() {
         CREATE TABLE IF NOT EXISTS bot_referrals (
           referred_chat_id BIGINT PRIMARY KEY,
           referrer_chat_id BIGINT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS bot_subscriptions (
+          chat_id BIGINT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('whale', 'news')),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (chat_id, type)
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS bot_seen_whales (
+          tx_id TEXT PRIMARY KEY,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `);
@@ -187,6 +205,104 @@ async function countReferrals(referrerChatId) {
   return result.rows[0]?.count || 0;
 }
 
+function getMemorySubscriptionSet(type) {
+  if (!memorySubscriptions.has(type)) memorySubscriptions.set(type, new Set());
+  return memorySubscriptions.get(type);
+}
+
+async function isSubscribed(chatId, type) {
+  await initBotStore();
+  const key = String(chatId);
+
+  if (!usingDatabase) return getMemorySubscriptionSet(type).has(key);
+
+  const result = await pool.query(
+    'SELECT 1 FROM bot_subscriptions WHERE chat_id = $1 AND type = $2',
+    [key, type]
+  );
+  return result.rowCount > 0;
+}
+
+async function subscribe(chatId, type) {
+  await initBotStore();
+  const key = String(chatId);
+
+  if (!usingDatabase) {
+    getMemorySubscriptionSet(type).add(key);
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO bot_subscriptions (chat_id, type)
+     VALUES ($1, $2)
+     ON CONFLICT (chat_id, type) DO NOTHING`,
+    [key, type]
+  );
+}
+
+async function unsubscribe(chatId, type) {
+  await initBotStore();
+  const key = String(chatId);
+
+  if (!usingDatabase) {
+    getMemorySubscriptionSet(type).delete(key);
+    return;
+  }
+
+  await pool.query(
+    'DELETE FROM bot_subscriptions WHERE chat_id = $1 AND type = $2',
+    [key, type]
+  );
+}
+
+async function listSubscribers(type) {
+  await initBotStore();
+
+  if (!usingDatabase) return Array.from(getMemorySubscriptionSet(type));
+
+  const result = await pool.query(
+    'SELECT chat_id FROM bot_subscriptions WHERE type = $1 ORDER BY created_at ASC',
+    [type]
+  );
+  return result.rows.map(row => row.chat_id);
+}
+
+async function countSubscribers(type) {
+  await initBotStore();
+
+  if (!usingDatabase) return getMemorySubscriptionSet(type).size;
+
+  const result = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM bot_subscriptions WHERE type = $1',
+    [type]
+  );
+  return result.rows[0]?.count || 0;
+}
+
+async function rememberWhaleTx(txId) {
+  await initBotStore();
+  const key = String(txId || '');
+  if (!key) return false;
+
+  if (!usingDatabase) {
+    if (memorySeenWhales.has(key)) return false;
+    memorySeenWhales.add(key);
+    if (memorySeenWhales.size > 1000) {
+      const first = memorySeenWhales.values().next().value;
+      memorySeenWhales.delete(first);
+    }
+    return true;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO bot_seen_whales (tx_id)
+     VALUES ($1)
+     ON CONFLICT (tx_id) DO NOTHING`,
+    [key]
+  );
+  return result.rowCount > 0;
+}
+
 module.exports = {
   initBotStore,
   getPriceAlert,
@@ -195,5 +311,11 @@ module.exports = {
   listPriceAlerts,
   countPriceAlerts,
   recordReferral,
-  countReferrals
+  countReferrals,
+  isSubscribed,
+  subscribe,
+  unsubscribe,
+  listSubscribers,
+  countSubscribers,
+  rememberWhaleTx
 };

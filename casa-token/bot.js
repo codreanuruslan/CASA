@@ -4,6 +4,10 @@ const botStore = require('./botStore');
 const DEFAULT_CASA_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 const PRODUCTION_PUBLIC_URL = 'https://www.casafond.com';
 const ALERT_INTERVAL_MS = 5 * 60 * 1000;
+const SUBSCRIPTION_WHALE = 'whale';
+const SUBSCRIPTION_NEWS = 'news';
+
+let lastKnownPrice = null;
 
 function isLocalhostUrl(url) {
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
@@ -34,6 +38,11 @@ function getCasaAddress() {
   return process.env.CASA_JETTON_ADDRESS || process.env.CONTRACT_ADDRESS || DEFAULT_CASA_ADDRESS;
 }
 
+function getWhaleThreshold() {
+  const threshold = Number(process.env.WHALE_THRESHOLD_USD || 1000);
+  return Number.isFinite(threshold) && threshold > 0 ? threshold : 1000;
+}
+
 function money(value, digits = 2) {
   if (value === null || value === undefined || value === '') return 'н/д';
   const number = Number(value);
@@ -59,6 +68,21 @@ function percent(value) {
   return sign + number.toFixed(2) + '%';
 }
 
+function shortAddr(address) {
+  if (!address || typeof address === 'object') return '-';
+  const value = String(address);
+  if (value.length < 12) return value;
+  return value.slice(0, 6) + '...' + value.slice(-4);
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 async function readApi(path) {
   const response = await fetch(getPublicUrl() + path, {
     headers: { Accept: 'application/json' }
@@ -79,12 +103,20 @@ function mainKeyboard() {
       Markup.button.callback('📈 Статистика', 'stats')
     ],
     [
+      Markup.button.callback('📊 График', 'chart_menu'),
+      Markup.button.callback('🏆 Топ холдеров', 'top_holders')
+    ],
+    [
       Markup.button.callback('📜 Контракт', 'contract'),
       Markup.button.callback('👛 Баланс', 'balance_menu')
     ],
     [
       Markup.button.callback('🔔 Алерт цены', 'alert_menu'),
       Markup.button.callback('🤝 Рефералка', 'referral')
+    ],
+    [
+      Markup.button.callback('🐳 Whale Alerts', 'whale_menu'),
+      Markup.button.callback('📰 Новости', 'news_menu')
     ],
     [
       Markup.button.url('🌐 Открыть сайт', siteUrl),
@@ -100,6 +132,17 @@ function backKeyboard(label = '⬅️ В меню') {
 function buyBackKeyboard() {
   return Markup.inlineKeyboard([
     [Markup.button.webApp('🚀 Купить CASA', getTelegramAppUrl() + '/miniapp')],
+    [Markup.button.callback('⬅️ В меню', 'start')]
+  ]);
+}
+
+function chartPeriodKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('24ч', 'chart_1d'),
+      Markup.button.callback('7д', 'chart_7d'),
+      Markup.button.callback('30д', 'chart_30d')
+    ],
     [Markup.button.callback('⬅️ В меню', 'start')]
   ]);
 }
@@ -123,6 +166,10 @@ async function setBotCommands(bot) {
     { command: 'buy', description: 'Купить CASA' },
     { command: 'price', description: 'Текущая цена' },
     { command: 'stats', description: 'Статистика токена' },
+    { command: 'chart', description: 'График цены CASA' },
+    { command: 'top', description: 'Топ холдеров CASA' },
+    { command: 'whale', description: 'Подписка на крупные сделки' },
+    { command: 'news', description: 'Подписка на новости CASA' },
     { command: 'contract', description: 'Контракт CASA' },
     { command: 'alerts', description: 'Мой алерт цены' },
     { command: 'cancelalert', description: 'Отменить алерт' },
@@ -138,6 +185,10 @@ function helpText() {
     '/menu — главное меню\n' +
     '/price — текущая цена\n' +
     '/stats — статистика токена\n' +
+    '/chart — график цены\n' +
+    '/top — топ холдеров\n' +
+    '/whale — подписка на крупные сделки\n' +
+    '/news — подписка на новости\n' +
     '/contract — информация о контракте\n' +
     '/buy — купить CASA\n' +
     '/alert 0.05 above — алерт на рост цены\n' +
@@ -239,6 +290,316 @@ async function sendContract(ctx) {
     console.error('Contract command failed', error);
     await ctx.reply('⚠️ Не удалось получить данные контракта.');
   }
+}
+
+async function sendChartMenu(ctx) {
+  await replyOrEdit(ctx, '📊 <b>График цены CASA</b>\n\nВыберите период:', chartPeriodKeyboard());
+}
+
+function normalizeHistory(raw) {
+  const points = Array.isArray(raw) ? raw : [];
+  return points
+    .map(point => ({
+      price: Number(point.price),
+      ts: Number(point.ts || point.time || point.date || Date.now())
+    }))
+    .filter(point => Number.isFinite(point.price) && point.price > 0);
+}
+
+function chartLabel(ts, period) {
+  const date = new Date(ts);
+  if (period === '1d') {
+    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+async function loadChartPoints(period) {
+  const limits = { '1d': 24, '7d': 60, '30d': 60 };
+  const limit = limits[period] || 24;
+  const history = normalizeHistory(await readApi('/api/price/history?limit=' + limit));
+
+  if (history.length >= 2) return history;
+
+  const current = await readApi('/api/price');
+  const price = Number(current.price);
+  if (!Number.isFinite(price) || price <= 0) return [];
+
+  const now = Date.now();
+  return [
+    { price, ts: now - 60 * 60 * 1000 },
+    { price, ts: now }
+  ];
+}
+
+async function sendChart(ctx, period) {
+  const periodLabels = { '1d': '24 часа', '7d': '7 дней', '30d': '30 дней' };
+
+  try {
+    const points = await loadChartPoints(period);
+    if (points.length < 2) throw new Error('Not enough chart points');
+
+    const labels = points.map(point => chartLabel(point.ts, period));
+    const prices = points.map(point => point.price);
+    const firstPrice = prices[0];
+    const lastPrice = prices[prices.length - 1];
+    const changePct = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+    const isUp = lastPrice >= firstPrice;
+    const lineColor = isUp ? '#23c55e' : '#ef4444';
+    const fillColor = isUp ? 'rgba(35,197,94,0.18)' : 'rgba(239,68,68,0.18)';
+
+    const chartConfig = {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'CASA/USD',
+          data: prices,
+          borderColor: lineColor,
+          backgroundColor: fillColor,
+          borderWidth: 3,
+          pointRadius: points.length > 30 ? 0 : 3,
+          fill: true,
+          tension: 0.35
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'CASA Token — ' + (periodLabels[period] || 'график'),
+            color: '#ffffff',
+            font: { size: 18 }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#cbd5e1', maxTicksLimit: 8 },
+            grid: { color: 'rgba(148,163,184,0.18)' }
+          },
+          y: {
+            ticks: { color: '#cbd5e1' },
+            grid: { color: 'rgba(148,163,184,0.18)' }
+          }
+        }
+      }
+    };
+
+    const chartUrl =
+      'https://quickchart.io/chart?bkg=%230f172a&w=900&h=460&c=' +
+      encodeURIComponent(JSON.stringify(chartConfig));
+    const caption =
+      `📊 <b>CASA — ${periodLabels[period] || 'график'}</b>\n\n` +
+      '<b>Цена:</b> ' + money(lastPrice, 6) + '\n' +
+      '<b>Изменение:</b> ' + percent(changePct);
+
+    await ctx.replyWithPhoto(
+      { url: chartUrl },
+      { caption, parse_mode: 'HTML', ...chartPeriodKeyboard() }
+    );
+  } catch (error) {
+    console.error('Chart command failed', error);
+    await replyOrEdit(ctx, '⚠️ Не удалось построить график. Попробуйте позже.', backKeyboard());
+  }
+}
+
+async function sendTopHolders(ctx) {
+  try {
+    const address = getCasaAddress();
+    const response = await fetch(
+      `https://tonapi.io/v2/jettons/${encodeURIComponent(address)}/holders?limit=10`,
+      { headers: { Accept: 'application/json' } }
+    );
+
+    if (!response.ok) throw new Error('TonAPI holders request failed');
+
+    const data = await response.json();
+    const holders = data.addresses || data.holders || [];
+
+    if (!holders.length) {
+      await replyOrEdit(ctx, '⚠️ Не удалось загрузить топ холдеров.', backKeyboard());
+      return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉', '4.', '5.', '6.', '7.', '8.', '9.', '10.'];
+    let text = '🏆 <b>Топ 10 холдеров CASA</b>\n\n';
+
+    holders.slice(0, 10).forEach((holder, index) => {
+      const rawBalance = holder.balance || holder.amount || holder.jetton_balance;
+      const balance = rawBalance
+        ? (Number(rawBalance) / 1e9).toLocaleString('en-US', { maximumFractionDigits: 0 })
+        : 'н/д';
+      const owner = holder.owner?.address || holder.wallet?.address || holder.address || holder.owner || '';
+      text += `${medals[index]} <code>${shortAddr(owner)}</code> — <b>${balance} CASA</b>\n`;
+    });
+
+    text += '\n<i>Данные: tonapi.io</i>';
+    await replyOrEdit(ctx, text, backKeyboard());
+  } catch (error) {
+    console.error('Top holders command failed', error);
+    await replyOrEdit(ctx, '⚠️ Не удалось загрузить топ холдеров. Попробуйте позже.', backKeyboard());
+  }
+}
+
+async function sendWhaleMenu(ctx) {
+  const chatId = ctx.chat?.id || ctx.from?.id;
+  const subscribed = await botStore.isSubscribed(chatId, SUBSCRIPTION_WHALE);
+  const threshold = getWhaleThreshold();
+  const text = subscribed
+    ? `🐳 <b>Whale Alerts активны</b>\n\nВы получаете уведомления о крупных переводах CASA от <b>${money(threshold, 0)}</b>.\n\nМожно отключить подписку кнопкой ниже.`
+    : `🐳 <b>Whale Alerts</b>\n\nБот будет присылать уведомления, когда видит крупный перевод CASA от <b>${money(threshold, 0)}</b>.\n\nПорог задаётся переменной <code>WHALE_THRESHOLD_USD</code>.`;
+
+  const keyboard = subscribed
+    ? Markup.inlineKeyboard([
+        [Markup.button.callback('🔕 Отключить Whale Alerts', 'whale_unsub')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ])
+    : Markup.inlineKeyboard([
+        [Markup.button.callback('🐳 Подключить Whale Alerts', 'whale_sub')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ]);
+
+  await replyOrEdit(ctx, text, keyboard);
+}
+
+async function sendNewsMenu(ctx) {
+  const chatId = ctx.chat?.id || ctx.from?.id;
+  const subscribed = await botStore.isSubscribed(chatId, SUBSCRIPTION_NEWS);
+  const text = subscribed
+    ? '📰 <b>Новости CASA активны</b>\n\nВы подписаны на анонсы проекта, обновления и важные сообщения.'
+    : '📰 <b>Новости CASA</b>\n\nПодпишитесь, чтобы получать анонсы проекта, обновления и важные сообщения прямо в Telegram.';
+
+  const keyboard = subscribed
+    ? Markup.inlineKeyboard([
+        [Markup.button.callback('🔕 Отписаться от новостей', 'news_unsub')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ])
+    : Markup.inlineKeyboard([
+        [Markup.button.callback('📰 Подписаться на новости', 'news_sub')],
+        [Markup.button.callback('⬅️ В меню', 'start')]
+      ]);
+
+  await replyOrEdit(ctx, text, keyboard);
+}
+
+function getTransferId(tx) {
+  return (
+    tx.transaction_id ||
+    tx.tx_hash ||
+    tx.hash ||
+    tx.event_id ||
+    tx.trace_id ||
+    [tx.timestamp || tx.utime || '', tx.amount || tx.jetton_amount || '', tx.sender?.address || tx.from || '', tx.recipient?.address || tx.to || ''].join(':')
+  );
+}
+
+function getTransferAmount(tx) {
+  const raw = tx.amount || tx.jetton_amount || tx.value || tx.quantity;
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return amount / 1e9;
+}
+
+async function loadCurrentPrice() {
+  if (lastKnownPrice) return lastKnownPrice;
+  const data = await readApi('/api/price');
+  const price = Number(data.price);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  lastKnownPrice = price;
+  return price;
+}
+
+async function checkWhaleTransactions(bot) {
+  const subscribers = await botStore.listSubscribers(SUBSCRIPTION_WHALE);
+  if (subscribers.length === 0) return;
+
+  try {
+    const price = await loadCurrentPrice();
+    if (!price) return;
+
+    const address = getCasaAddress();
+    const response = await fetch(
+      `https://tonapi.io/v2/jettons/${encodeURIComponent(address)}/transfers?limit=20`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!response.ok) throw new Error('TonAPI transfers request failed');
+
+    const data = await response.json();
+    const transfers = data.events || data.transfers || data.items || [];
+    const threshold = getWhaleThreshold();
+    const fiveMinutesAgo = Date.now() - ALERT_INTERVAL_MS;
+
+    for (const tx of transfers) {
+      const timestamp = Number(tx.timestamp || tx.utime || 0);
+      if (timestamp && timestamp * 1000 < fiveMinutesAgo) continue;
+
+      const amount = getTransferAmount(tx);
+      const usdValue = amount * price;
+      if (usdValue < threshold) continue;
+
+      const txId = getTransferId(tx);
+      const isNew = await botStore.rememberWhaleTx(txId);
+      if (!isNew) continue;
+
+      const fromAddr = shortAddr(tx.sender?.address || tx.from || tx.source?.address || '');
+      const toAddr = shortAddr(tx.recipient?.address || tx.to || tx.destination?.address || '');
+      const tonviewerUrl = tx.hash || tx.transaction_id
+        ? `https://tonviewer.com/transaction/${encodeURIComponent(tx.hash || tx.transaction_id)}`
+        : `https://tonviewer.com/${encodeURIComponent(address)}`;
+
+      const message =
+        '🐳 <b>Whale Alert CASA</b>\n\n' +
+        '<b>Сумма:</b> ' + compact(amount) + ' CASA\n' +
+        '<b>Стоимость:</b> ~' + money(usdValue, 0) + '\n' +
+        '<b>Порог:</b> ' + money(threshold, 0) + '\n\n' +
+        'От: <code>' + fromAddr + '</code>\n' +
+        'Кому: <code>' + toAddr + '</code>\n\n' +
+        '<a href="' + tonviewerUrl + '">Открыть в Tonviewer</a>';
+
+      for (const chatId of subscribers) {
+        try {
+          await bot.telegram.sendMessage(chatId, message, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          });
+        } catch (error) {
+          console.error('Whale alert delivery failed', error);
+        }
+      }
+
+      return;
+    }
+  } catch (error) {
+    console.error('Whale check failed', error);
+  }
+}
+
+async function broadcastNews(bot, title, text, url) {
+  const subscribers = await botStore.listSubscribers(SUBSCRIPTION_NEWS);
+  if (subscribers.length === 0) return 0;
+
+  const safeTitle = escapeHtml(title).slice(0, 180);
+  const safeText = escapeHtml(text).slice(0, 3000);
+  let message = `📰 <b>${safeTitle}</b>\n\n${safeText}`;
+
+  if (url && /^https?:\/\//i.test(url)) {
+    message += '\n\n<a href="' + escapeHtml(url) + '">Читать полностью</a>';
+  }
+
+  let sent = 0;
+  for (const chatId of subscribers) {
+    try {
+      await bot.telegram.sendMessage(chatId, message, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: false
+      });
+      sent += 1;
+    } catch (error) {
+      console.error('News delivery failed', error);
+    }
+  }
+  return sent;
 }
 
 async function sendAlertMenu(ctx) {
@@ -348,6 +709,7 @@ async function checkPriceAlerts(bot) {
   try {
     const data = await readApi('/api/price');
     currentPrice = Number(data.price);
+    if (Number.isFinite(currentPrice) && currentPrice > 0) lastKnownPrice = currentPrice;
     if (!Number.isFinite(currentPrice)) return;
   } catch (error) {
     console.error('Price alert check failed', error);
@@ -387,6 +749,10 @@ function createBot() {
   bot.command('menu', sendStart);
   bot.command('price', sendPrice);
   bot.command('stats', sendStats);
+  bot.command('chart', sendChartMenu);
+  bot.command('top', sendTopHolders);
+  bot.command('whale', sendWhaleMenu);
+  bot.command('news', sendNewsMenu);
   bot.command('contract', sendContract);
   bot.command('balance', checkBalance);
   bot.command('referral', sendReferral);
@@ -429,6 +795,34 @@ function createBot() {
     await ctx.answerCbQuery();
     await sendStats(ctx);
   });
+  bot.action('chart_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendChartMenu(ctx);
+  });
+  bot.action('top_holders', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendTopHolders(ctx);
+  });
+  bot.action('whale_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendWhaleMenu(ctx);
+  });
+  bot.action('news_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendNewsMenu(ctx);
+  });
+  bot.action('chart_1d', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendChart(ctx, '1d');
+  });
+  bot.action('chart_7d', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendChart(ctx, '7d');
+  });
+  bot.action('chart_30d', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendChart(ctx, '30d');
+  });
   bot.action('contract', async (ctx) => {
     await ctx.answerCbQuery();
     await sendContract(ctx);
@@ -452,6 +846,26 @@ function createBot() {
   bot.action('alert_cancel', async (ctx) => {
     await ctx.answerCbQuery();
     await cancelAlert(ctx);
+  });
+  bot.action('whale_sub', async (ctx) => {
+    await ctx.answerCbQuery();
+    await botStore.subscribe(ctx.chat.id, SUBSCRIPTION_WHALE);
+    await replyOrEdit(ctx, '🐳 <b>Whale Alerts подключены.</b>\n\nБот пришлёт уведомление, когда увидит крупное движение CASA.', backKeyboard());
+  });
+  bot.action('whale_unsub', async (ctx) => {
+    await ctx.answerCbQuery();
+    await botStore.unsubscribe(ctx.chat.id, SUBSCRIPTION_WHALE);
+    await replyOrEdit(ctx, '🔕 Whale Alerts отключены.', backKeyboard());
+  });
+  bot.action('news_sub', async (ctx) => {
+    await ctx.answerCbQuery();
+    await botStore.subscribe(ctx.chat.id, SUBSCRIPTION_NEWS);
+    await replyOrEdit(ctx, '📰 <b>Подписка на новости активна.</b>\n\nБудем присылать важные анонсы CASA.', backKeyboard());
+  });
+  bot.action('news_unsub', async (ctx) => {
+    await ctx.answerCbQuery();
+    await botStore.unsubscribe(ctx.chat.id, SUBSCRIPTION_NEWS);
+    await replyOrEdit(ctx, '🔕 Вы отписались от новостей CASA.', backKeyboard());
   });
 
   bot.catch((error, ctx) => {
@@ -539,12 +953,41 @@ function attachTelegramBot(app) {
         pendingUpdateCount: info.pending_update_count,
         lastErrorDate: info.last_error_date,
         lastErrorMessage: info.last_error_message,
-        activeAlerts: await botStore.countPriceAlerts()
+        activeAlerts: await botStore.countPriceAlerts(),
+        subscribers: {
+          whale: await botStore.countSubscribers(SUBSCRIPTION_WHALE),
+          news: await botStore.countSubscribers(SUBSCRIPTION_NEWS)
+        },
+        whaleThresholdUsd: getWhaleThreshold()
       }
     });
   });
 
-  const alertTimer = setInterval(() => checkPriceAlerts(bot), ALERT_INTERVAL_MS);
+  app.post('/api/telegram/broadcast-news', async (req, res) => {
+    if (!hasAdminAccess(req)) {
+      res.status(403).json({ ok: false, error: 'Forbidden' });
+      return;
+    }
+
+    const { title, text, url } = req.body || {};
+    if (!title || !text) {
+      res.status(400).json({ ok: false, error: 'title and text are required' });
+      return;
+    }
+
+    try {
+      const sent = await broadcastNews(bot, title, text, url);
+      res.json({ ok: true, data: { sent, total: await botStore.countSubscribers(SUBSCRIPTION_NEWS) } });
+    } catch (error) {
+      console.error('Broadcast news failed', error);
+      res.status(500).json({ ok: false, error: 'Broadcast failed' });
+    }
+  });
+
+  const alertTimer = setInterval(async () => {
+    await checkPriceAlerts(bot);
+    await checkWhaleTransactions(bot);
+  }, ALERT_INTERVAL_MS);
 
   if (pollingEnabled) {
     bot.launch()
@@ -570,7 +1013,9 @@ function attachTelegramBot(app) {
   return {
     bot,
     webhookPath,
-    checkPriceAlerts: () => checkPriceAlerts(bot)
+    checkPriceAlerts: () => checkPriceAlerts(bot),
+    checkWhaleTransactions: () => checkWhaleTransactions(bot),
+    broadcastNews: (title, text, url) => broadcastNews(bot, title, text, url)
   };
 }
 
