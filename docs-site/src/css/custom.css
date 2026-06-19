@@ -1,0 +1,45 @@
+:root {
+  --ifm-color-primary: #0098ea;
+  --ifm-color-primary-dark: #0089d3;
+  --ifm-color-primary-darker: #0081c7;
+  --ifm-color-primary-darkest: #006aa4;
+  --ifm-color-primary-light: #14a7ff;
+  --ifm-color-primary-lighter: #22acff;
+  --ifm-color-primary-lightest: #4cbcff;
+  --ifm-code-font-size: 92%;
+  --ifm-background-color: #f7f9fc;
+}
+
+[data-theme='dark'] {
+  --ifm-background-color: #070c18;
+  --ifm-background-surface-color: #0d1425;
+  --ifm-navbar-background-color: rgba(7, 12, 24, 0.94);
+  --ifm-footer-background-color: #050914;
+  --ifm-color-primary: #18a8f2;
+}
+
+.navbar {
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 152, 234, 0.18);
+}
+
+.navbar__logo img {
+  border-radius: 10px;
+}
+
+.theme-doc-markdown h1 {
+  letter-spacing: -0.03em;
+}
+
+.theme-doc-markdown table {
+  display: table;
+  width: 100%;
+}
+
+.theme-doc-markdown code {
+  border-color: rgba(0, 152, 234, 0.25);
+}
+
+.alert {
+  border-radius: 12px;
+}

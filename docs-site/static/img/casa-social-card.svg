@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">CASA Documentation</title>
+  <desc id="desc">Техническая документация CASA Token на GRAMM</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070c18"/>
+      <stop offset="1" stop-color="#101d39"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0098ea"/>
+      <stop offset="1" stop-color="#7b61ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1030" cy="110" r="260" fill="#0098ea" opacity=".08"/>
+  <circle cx="1060" cy="570" r="320" fill="#7b61ff" opacity=".08"/>
+  <rect x="82" y="96" width="86" height="86" rx="22" fill="url(#accent)"/>
+  <path d="M105 145l20-25 20 25v19h-15v-17h-10v17h-15z" fill="white"/>
+  <text x="82" y="280" fill="white" font-family="Arial, sans-serif" font-size="78" font-weight="700">CASA Documentation</text>
+  <text x="86" y="350" fill="#8fcff3" font-family="Arial, sans-serif" font-size="34">Frontend · REST API · TON Connect · STON.fi</text>
+  <rect x="84" y="418" width="410" height="4" rx="2" fill="url(#accent)"/>
+  <text x="86" y="490" fill="#aebbd0" font-family="Arial, sans-serif" font-size="28">CASA Token на GRAMM Blockchain</text>
+</svg>

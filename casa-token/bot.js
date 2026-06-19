@@ -1,7 +1,9 @@
 const { Telegraf, Markup } = require('telegraf');
+const botStore = require('./botStore');
 
 const DEFAULT_CASA_ADDRESS = 'EQBWK_VVEBJWiIQIIXOckUVw0HdF24buJiNiiR0dUHEe2xs4';
 const PRODUCTION_PUBLIC_URL = 'https://www.casafond.com';
+const ALERT_INTERVAL_MS = 5 * 60 * 1000;
 
 function isLocalhostUrl(url) {
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|$)/i.test(url);
@@ -15,14 +17,12 @@ function getPublicUrl() {
   ) {
     return PRODUCTION_PUBLIC_URL;
   }
-  return url === 'https://casafond.com' ? 'https://www.casafond.com' : url;
+  return url === 'https://casafond.com' ? PRODUCTION_PUBLIC_URL : url;
 }
 
 function getTelegramAppUrl() {
   const url = getPublicUrl();
-  if (isLocalhostUrl(url) || !url.startsWith('https://')) {
-    return PRODUCTION_PUBLIC_URL;
-  }
+  if (isLocalhostUrl(url) || !url.startsWith('https://')) return PRODUCTION_PUBLIC_URL;
   return url;
 }
 
@@ -55,12 +55,8 @@ function percent(value) {
   if (value === null || value === undefined || value === '') return 'н/д';
   const number = Number(value);
   if (!Number.isFinite(number)) return 'н/д';
-  return (number >= 0 ? '+' : '') + number.toFixed(2) + '%';
-}
-
-function shortAddress(address) {
-  if (!address) return '-';
-  return address.slice(0, 6) + '...' + address.slice(-6);
+  const sign = number >= 0 ? '📈 +' : '📉 ';
+  return sign + number.toFixed(2) + '%';
 }
 
 async function readApi(path) {
@@ -74,73 +70,231 @@ async function readApi(path) {
   return payload.data || payload;
 }
 
-function actionKeyboard() {
+function mainKeyboard() {
   const siteUrl = getTelegramAppUrl();
-  const swapUrl = siteUrl + '/miniapp';
-  const address = getCasaAddress();
-  const buyButton = Markup.button.webApp('Купить CASA', swapUrl);
-
   return Markup.inlineKeyboard([
-    [buyButton],
+    [Markup.button.webApp('🛒 Купить CASA', siteUrl + '/miniapp')],
     [
-      Markup.button.url('Открыть сайт', siteUrl),
-      Markup.button.url('Контракт', 'https://tonviewer.com/' + address)
+      Markup.button.callback('💵 Цена', 'price'),
+      Markup.button.callback('📊 Статистика', 'stats')
     ],
-    [Markup.button.callback('Цена', 'price'), Markup.button.callback('Статистика', 'stats')]
+    [
+      Markup.button.callback('📋 Контракт', 'contract'),
+      Markup.button.url('🌐 Сайт', siteUrl)
+    ],
+    [
+      Markup.button.callback('🔔 Алерт на цену', 'alert_menu'),
+      Markup.button.callback('👛 Мой баланс', 'balance_menu')
+    ],
+    [Markup.button.callback('👥 Реферальная ссылка', 'referral')]
   ]);
+}
+
+function backKeyboard() {
+  return Markup.inlineKeyboard([[Markup.button.callback('← Назад', 'start')]]);
+}
+
+async function replyOrEdit(ctx, text, keyboard) {
+  if (ctx.callbackQuery) {
+    return ctx.editMessageText(text, { parse_mode: 'HTML', ...keyboard });
+  }
+  return ctx.replyWithHTML(text, keyboard);
 }
 
 async function sendStart(ctx) {
   const address = getCasaAddress();
-  await ctx.replyWithHTML(
-    '<b>CASA Token</b>\n\n' +
-    'Здесь можно проверить цену, статистику и перейти к покупке CASA через TON Connect.\n\n' +
-    '<b>Контракт:</b> <code>' + address + '</code>',
-    actionKeyboard()
-  );
+  const startPayload = ctx.startPayload;
+
+  if (startPayload && startPayload.startsWith('ref_')) {
+    const referrerId = Number.parseInt(startPayload.replace('ref_', ''), 10);
+    const myId = ctx.from.id;
+    if (referrerId && referrerId !== myId) {
+      const referral = await botStore.recordReferral(myId, referrerId);
+      if (referral.created) {
+        try {
+          await ctx.telegram.sendMessage(
+            referrerId,
+            `🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\nВсего рефералов: ${referral.count}`
+          );
+        } catch (_) {}
+      }
+    }
+  }
+
+  const text =
+    '🏠 <b>CASA Token</b>\n\n' +
+    '💎 Токен экосистемы CasaFond на блокчейне TON.\n\n' +
+    'Покупайте, отслеживайте цену и статистику прямо здесь.\n\n' +
+    '📋 <b>Контракт:</b>\n<code>' + address + '</code>';
+
+  await replyOrEdit(ctx, text, mainKeyboard());
 }
 
 async function sendPrice(ctx) {
-  const data = await readApi('/api/price');
-  await ctx.replyWithHTML(
-    '<b>Цена CASA</b>\n\n' +
-    '<b>CASA/USD:</b> ' + money(data.price, 6) + '\n' +
-    '<b>24ч:</b> ' + percent(data.changePct24h) + '\n' +
-    '<b>Обновлено:</b> ' + new Date(data.updatedAt).toLocaleString('ru-RU'),
-    actionKeyboard()
-  );
+  try {
+    const data = await readApi('/api/price');
+    const text =
+      '💵 <b>Цена CASA</b>\n\n' +
+      '<b>Цена:</b> ' + money(data.price, 6) + '\n' +
+      '<b>24ч:</b> ' + percent(data.changePct24h) + '\n' +
+      '<b>Обновлено:</b> ' + new Date(data.updatedAt).toLocaleString('ru-RU');
+
+    await replyOrEdit(ctx, text, backKeyboard());
+  } catch (error) {
+    console.error('Price command failed', error);
+    await ctx.reply('⚠️ Не удалось получить цену. Попробуйте позже.');
+  }
 }
 
 async function sendStats(ctx) {
-  const data = await readApi('/api/stats');
-  await ctx.replyWithHTML(
-    '<b>Статистика CASA</b>\n\n' +
-    '<b>Market cap:</b> ' + money(data.marketCap, 0) + '\n' +
-    '<b>FDV:</b> ' + money(data.fdv, 0) + '\n' +
-    '<b>Volume 24h:</b> ' + money(data.volume24h, 0) + '\n' +
-    '<b>Liquidity:</b> ' + money(data.liquidityUsd, 0) + '\n' +
-    '<b>Holders:</b> ' + compact(data.holders) + '\n' +
-    '<b>Network:</b> ' + data.network,
-    actionKeyboard()
-  );
+  try {
+    const data = await readApi('/api/stats');
+    const text =
+      '📊 <b>Статистика CASA</b>\n\n' +
+      '<b>Market Cap:</b> ' + money(data.marketCap, 0) + '\n' +
+      '<b>FDV:</b> ' + money(data.fdv, 0) + '\n' +
+      '<b>Volume 24h:</b> ' + money(data.volume24h, 0) + '\n' +
+      '<b>Ликвидность:</b> ' + money(data.liquidityUsd, 0) + '\n' +
+      '<b>Холдеры:</b> ' + compact(data.holders) + '\n' +
+      '<b>Сеть:</b> ' + data.network;
+
+    await replyOrEdit(ctx, text, backKeyboard());
+  } catch (error) {
+    console.error('Stats command failed', error);
+    await ctx.reply('⚠️ Не удалось получить статистику. Попробуйте позже.');
+  }
 }
 
 async function sendContract(ctx) {
-  const data = await readApi('/api/contract');
-  const address = data.address || getCasaAddress();
-  await ctx.replyWithHTML(
-    '<b>Контракт CASA</b>\n\n' +
-    '<code>' + address + '</code>\n\n' +
-    '<b>Сеть:</b> ' + (data.network || 'GRAMM') + '\n' +
-    '<b>Стандарт:</b> ' + (data.standard || 'Jetton') + '\n' +
-    '<b>Проверен:</b> ' + (data.verified ? 'да' : 'нет'),
-    Markup.inlineKeyboard([
-      [Markup.button.url('Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
-      [
-        Markup.button.webApp('Купить CASA', getTelegramAppUrl() + '/miniapp')
-      ]
-    ])
-  );
+  try {
+    const data = await readApi('/api/contract');
+    const address = data.address || getCasaAddress();
+    const text =
+      '📋 <b>Контракт CASA</b>\n\n' +
+      '<code>' + address + '</code>\n\n' +
+      '<b>Сеть:</b> ' + (data.network || 'TON') + '\n' +
+      '<b>Стандарт:</b> ' + (data.standard || 'Jetton') + '\n' +
+      '<b>Проверен:</b> ' + (data.verified ? '✅ да' : '❌ нет');
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.url('🔍 Открыть в Tonviewer', 'https://tonviewer.com/' + address)],
+      [Markup.button.webApp('🛒 Купить CASA', getTelegramAppUrl() + '/miniapp')],
+      [Markup.button.callback('← Назад', 'start')]
+    ]);
+
+    await replyOrEdit(ctx, text, keyboard);
+  } catch (error) {
+    console.error('Contract command failed', error);
+    await ctx.reply('⚠️ Не удалось получить данные контракта.');
+  }
+}
+
+async function sendAlertMenu(ctx) {
+  const chatId = ctx.chat.id;
+  const existing = await botStore.getPriceAlert(chatId);
+  const text = existing
+    ? `🔔 <b>Ваш алерт активен</b>\n\nУведомлю, когда цена <b>${existing.direction === 'above' ? 'вырастет выше' : 'упадёт ниже'} ${money(existing.price, 6)}</b>.\n\nЧтобы удалить, нажмите «Отменить алерт».`
+    : '🔔 <b>Алерт на цену</b>\n\nВведите команду:\n\n<code>/alert 0.05 above</code> — уведомить, когда цена вырастет выше $0.05\n<code>/alert 0.03 below</code> — уведомить, когда цена упадёт ниже $0.03';
+
+  const buttons = existing
+    ? [[Markup.button.callback('❌ Отменить алерт', 'alert_cancel')], [Markup.button.callback('← Назад', 'start')]]
+    : [[Markup.button.callback('← Назад', 'start')]];
+
+  await replyOrEdit(ctx, text, Markup.inlineKeyboard(buttons));
+}
+
+async function sendBalanceMenu(ctx) {
+  const text =
+    '👛 <b>Проверка баланса</b>\n\n' +
+    'Введите TON-адрес кошелька командой:\n\n' +
+    '<code>/balance UQ...</code>';
+
+  await replyOrEdit(ctx, text, backKeyboard());
+}
+
+async function checkBalance(ctx) {
+  const parts = ctx.message.text.trim().split(/\s+/);
+  const walletAddress = parts[1];
+
+  if (!walletAddress) {
+    await ctx.replyWithHTML('⚠️ Укажите адрес: <code>/balance UQ...</code>');
+    return;
+  }
+
+  try {
+    const casaAddress = getCasaAddress();
+    const response = await fetch(
+      `https://tonapi.io/v2/accounts/${encodeURIComponent(walletAddress)}/jettons/${encodeURIComponent(casaAddress)}`,
+      { headers: { Accept: 'application/json' } }
+    );
+
+    if (!response.ok) throw new Error('Wallet not found');
+
+    const data = await response.json();
+    const balance = data.balance
+      ? (Number(data.balance) / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })
+      : '0';
+
+    await ctx.replyWithHTML(
+      '👛 <b>Баланс кошелька</b>\n\n' +
+      '<b>Адрес:</b> <code>' + walletAddress.slice(0, 8) + '...' + walletAddress.slice(-6) + '</code>\n' +
+      '<b>CASA:</b> ' + balance + ' CASA',
+      backKeyboard()
+    );
+  } catch (error) {
+    console.error('Balance command failed', error);
+    await ctx.replyWithHTML('⚠️ Не удалось получить баланс.\n\nПроверьте адрес и попробуйте снова.', backKeyboard());
+  }
+}
+
+async function sendReferral(ctx) {
+  const chatId = ctx.from.id;
+  const botUsername = ctx.botInfo?.username || 'casafond_bot';
+  const refLink = `https://t.me/${botUsername}?start=ref_${chatId}`;
+  const count = await botStore.countReferrals(chatId);
+
+  const text =
+    '👥 <b>Реферальная программа</b>\n\n' +
+    'Поделитесь ссылкой и получайте уведомления, когда друзья присоединяются.\n\n' +
+    '<b>Ваша ссылка:</b>\n' +
+    '<code>' + refLink + '</code>\n\n' +
+    '👤 Привлечено рефералов: <b>' + count + '</b>';
+
+  await replyOrEdit(ctx, text, backKeyboard());
+}
+
+async function checkPriceAlerts(bot) {
+  const alerts = await botStore.listPriceAlerts();
+  if (alerts.length === 0) return;
+
+  let currentPrice;
+  try {
+    const data = await readApi('/api/price');
+    currentPrice = Number(data.price);
+    if (!Number.isFinite(currentPrice)) return;
+  } catch (error) {
+    console.error('Price alert check failed', error);
+    return;
+  }
+
+  for (const alert of alerts) {
+    const triggered =
+      (alert.direction === 'above' && currentPrice >= alert.price) ||
+      (alert.direction === 'below' && currentPrice <= alert.price);
+
+    if (!triggered) continue;
+
+    await botStore.deletePriceAlert(alert.chatId);
+    try {
+      await bot.telegram.sendMessage(
+        alert.chatId,
+        `🔔 <b>Алерт сработал!</b>\n\nЦена CASA достигла <b>$${currentPrice.toFixed(6)}</b>\n\nПорог: ${alert.direction === 'above' ? 'выше' : 'ниже'} $${alert.price}`,
+        { parse_mode: 'HTML', ...mainKeyboard() }
+      );
+    } catch (error) {
+      console.error('Price alert delivery failed', error);
+    }
+  }
 }
 
 function createBot() {
@@ -153,17 +307,57 @@ function createBot() {
   const bot = new Telegraf(token);
 
   bot.start(sendStart);
-  bot.command('buy', async (ctx) => {
-    await ctx.replyWithHTML(
-      '<b>Покупка CASA</b>\n\n' +
-      'Нажмите кнопку ниже, подключите TON-кошелек и подтвердите обмен на сайте.',
-      actionKeyboard()
-    );
-  });
   bot.command('price', sendPrice);
   bot.command('stats', sendStats);
   bot.command('contract', sendContract);
+  bot.command('balance', checkBalance);
+  bot.command('referral', sendReferral);
 
+  bot.command('buy', async (ctx) => {
+    await ctx.replyWithHTML(
+      '🛒 <b>Покупка CASA</b>\n\nНажмите кнопку, подключите TON-кошелёк и подтвердите обмен.',
+      Markup.inlineKeyboard([
+        [Markup.button.webApp('🛒 Купить CASA', getTelegramAppUrl() + '/miniapp')],
+        [Markup.button.callback('← Назад', 'start')]
+      ])
+    );
+  });
+
+  bot.command('alert', async (ctx) => {
+    const parts = ctx.message.text.trim().split(/\s+/);
+    const price = Number.parseFloat(parts[1]);
+    const direction = parts[2];
+
+    if (!Number.isFinite(price) || price <= 0 || !['above', 'below'].includes(direction)) {
+      await ctx.replyWithHTML('⚠️ Формат: <code>/alert 0.05 above</code> или <code>/alert 0.03 below</code>');
+      return;
+    }
+
+    await botStore.setPriceAlert(ctx.chat.id, { price, direction });
+    const directionText = direction === 'above' ? 'вырастет выше' : 'упадёт ниже';
+    await ctx.replyWithHTML(`🔔 Алерт установлен!\n\nУведомлю вас, когда CASA <b>${directionText} $${price}</b>.`, backKeyboard());
+  });
+
+  bot.help(async (ctx) => {
+    await ctx.replyWithHTML(
+      '📖 <b>Доступные команды</b>\n\n' +
+      '/start — главное меню\n' +
+      '/price — текущая цена\n' +
+      '/stats — статистика токена\n' +
+      '/contract — информация о контракте\n' +
+      '/buy — купить CASA\n' +
+      '/alert 0.05 above — алерт на рост цены\n' +
+      '/alert 0.03 below — алерт на падение цены\n' +
+      '/balance UQ... — баланс CASA на кошельке\n' +
+      '/referral — реферальная ссылка',
+      backKeyboard()
+    );
+  });
+
+  bot.action('start', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendStart(ctx);
+  });
   bot.action('price', async (ctx) => {
     await ctx.answerCbQuery();
     await sendPrice(ctx);
@@ -172,16 +366,33 @@ function createBot() {
     await ctx.answerCbQuery();
     await sendStats(ctx);
   });
-
-  bot.help(async (ctx) => {
-    await ctx.reply('/start - меню\n/price - цена\n/stats - статистика\n/contract - контракт\n/buy - купить CASA');
+  bot.action('contract', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendContract(ctx);
+  });
+  bot.action('alert_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendAlertMenu(ctx);
+  });
+  bot.action('balance_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendBalanceMenu(ctx);
+  });
+  bot.action('referral', async (ctx) => {
+    await ctx.answerCbQuery();
+    await sendReferral(ctx);
+  });
+  bot.action('alert_cancel', async (ctx) => {
+    await ctx.answerCbQuery();
+    await botStore.deletePriceAlert(ctx.chat.id);
+    await ctx.editMessageText('✅ Алерт отменён.', { parse_mode: 'HTML', ...backKeyboard() });
   });
 
   bot.catch((error, ctx) => {
     console.error('Telegram bot error', error);
     const message = process.env.NODE_ENV === 'production'
-      ? 'Временная ошибка бота. Попробуйте еще раз.'
-      : 'Ошибка бота: ' + (error?.description || error?.message || 'unknown');
+      ? '⚠️ Временная ошибка. Попробуйте ещё раз.'
+      : 'Ошибка: ' + (error?.description || error?.message || 'unknown');
     if (ctx?.reply) ctx.reply(message).catch(() => {});
   });
 
@@ -191,6 +402,7 @@ function createBot() {
 function attachTelegramBot(app) {
   const bot = createBot();
   if (!bot) return null;
+  botStore.initBotStore().catch(error => console.error('Bot store init failed', error));
 
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || 'telegram-webhook';
   const adminSecret = process.env.TELEGRAM_ADMIN_SECRET;
@@ -258,10 +470,13 @@ function attachTelegramBot(app) {
         actualWebhookUrl: info.url,
         pendingUpdateCount: info.pending_update_count,
         lastErrorDate: info.last_error_date,
-        lastErrorMessage: info.last_error_message
+        lastErrorMessage: info.last_error_message,
+        activeAlerts: await botStore.countPriceAlerts()
       }
     });
   });
+
+  const alertTimer = setInterval(() => checkPriceAlerts(bot), ALERT_INTERVAL_MS);
 
   if (pollingEnabled) {
     bot.launch()
@@ -269,6 +484,7 @@ function attachTelegramBot(app) {
       .catch(error => console.error('Telegram bot polling failed', error));
 
     const stop = signal => {
+      clearInterval(alertTimer);
       bot.stop(signal);
       process.exit(0);
     };
@@ -280,10 +496,14 @@ function attachTelegramBot(app) {
       .then(() => console.log('Telegram webhook configured:', webhookUrl))
       .catch(error => console.error('Telegram webhook setup failed', error));
   } else {
-    console.warn('Telegram webhook was not configured: PUBLIC_URL must be a public HTTPS URL or TELEGRAM_BOT_POLLING must be true.');
+    console.warn('Telegram webhook not configured: PUBLIC_URL must be HTTPS or set TELEGRAM_BOT_POLLING=true');
   }
 
-  return { bot, webhookPath };
+  return {
+    bot,
+    webhookPath,
+    checkPriceAlerts: () => checkPriceAlerts(bot)
+  };
 }
 
 module.exports = { attachTelegramBot, createBot };
