@@ -258,7 +258,6 @@ async function sendStats(ctx) {
       '<b>FDV:</b> ' + money(data.fdv, 0) + '\n' +
       '<b>Volume 24h:</b> ' + money(data.volume24h, 0) + '\n' +
       '<b>Ликвидность:</b> ' + money(data.liquidityUsd, 0) + '\n' +
-      '<b>Холдеры:</b> ' + compact(data.holders) + '\n' +
       '<b>Сеть:</b> ' + data.network;
 
     await replyOrEdit(ctx, text, backKeyboard());
