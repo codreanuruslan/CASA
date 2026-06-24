@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "news-bot": "node newsPublisherBot.js"
   },
   "dependencies": {
     "@ston-fi/api": "^0.32.0",
