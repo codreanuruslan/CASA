@@ -70,6 +70,7 @@ function decodeXml(value) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
     .replace(/&#39;/g, "'")
     .replace(/&#x2F;/g, '/');
 }
@@ -161,19 +162,85 @@ function trimText(value, maxLength) {
   return text.slice(0, maxLength - 1).trimEnd() + '...';
 }
 
+function displayTitle(item) {
+  return String(item.title || '').replace(/\s-\s[^-]+$/, '').trim();
+}
+
+function russianTitle(item) {
+  const title = displayTitle(item);
+  const normalized = title.toLowerCase();
+
+  if (normalized === 'agentic wallets') return 'Агентные кошельки в экосистеме TON';
+  if (normalized === 'ton ecosystem') return 'Экосистема TON';
+  if (normalized.includes('ton to gram rebrand')) return 'TON и GRAM: официальный ребрендинг';
+
+  return title
+    .replace(/\bTON\b/g, 'TON')
+    .replace(/\bToncoin\b/g, 'Toncoin')
+    .replace(/\bThe Open Network\b/g, 'The Open Network');
+}
+
+function cleanDescription(item) {
+  const title = displayTitle(item).toLowerCase();
+  const source = getSourceName(item).toLowerCase();
+  const description = trimText(item.description, 260);
+  const normalized = description
+    .replace(/\s+/g, ' ')
+    .replace(new RegExp(`\\b${escapeRegExp(source)}\\b`, 'ig'), '')
+    .trim()
+    .toLowerCase();
+
+  if (!description) return '';
+  if (normalized === title) return '';
+  if (normalized.length < 30) return '';
+  return description;
+}
+
+function russianDescription(item) {
+  const source = getSourceName(item) || 'официальный источник';
+  const title = displayTitle(item);
+  const normalized = title.toLowerCase();
+
+  if (normalized === 'agentic wallets') {
+    return 'TON рассказывает о новом направлении агентных кошельков: инструментах, которые помогают автоматизировать действия пользователя в Web3 и делают работу с крипто-сервисами проще.';
+  }
+
+  if (normalized === 'ton ecosystem') {
+    return 'Официальный раздел TON об экосистеме The Open Network: кошельках, приложениях, сервисах, инструментах для разработчиков и проектах, которые развивают сеть.';
+  }
+
+  if (normalized.includes('ton to gram rebrand')) {
+    return 'Официальный материал о переходе TON к бренду GRAM и о том, как это связано с развитием экосистемы The Open Network.';
+  }
+
+  const description = cleanDescription(item);
+  if (description) return description;
+
+  return `${source} опубликовал официальный материал о развитии TON: продуктах экосистемы, инфраструктуре The Open Network и сервисах, которые делают сеть полезнее для пользователей и разработчиков.`;
+}
+
 function telegramText(item) {
-  const intro = trimText(item.description, 450);
+  const source = getSourceName(item) || 'TON';
+  const title = russianTitle(item);
+  const intro = russianDescription(item);
+
   return [
-    `News: ${item.title}`,
-    intro,
-    item.link
+    `Официальная новость TON`,
+    ``,
+    `${title}`,
+    ``,
+    `${intro}`,
+    ``,
+    `Источник: ${source}`,
+    `Подробнее: ${item.link}`
   ].filter(Boolean).join('\n\n');
 }
 
 function tweetText(item) {
-  const title = trimText(item.title, 210);
+  const title = trimText(russianTitle(item), 160);
+  const intro = trimText(russianDescription(item), 80);
   const tags = process.env.NEWS_BOT_TWEET_TAGS || '#TON #CoinGecko';
-  return trimText(`${title}\n\n${item.link}\n\n${tags}`, 275);
+  return trimText(`${title}\n\n${intro}\n\n${item.link}\n\n${tags}`, 275);
 }
 
 async function readState() {

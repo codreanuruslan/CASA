@@ -162,6 +162,21 @@
         }
         .contract-label { color: var(--muted); white-space: nowrap; }
         .contract-address { font-family: 'Courier New', monospace; color: var(--cyan); background: none; border: none; }
+        .contract-verify-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 9px; border-radius: 999px;
+            border: 1px solid rgba(0,255,163,.75);
+            background: #00ffa3;
+            color: #05131a; text-decoration: none;
+            font-weight: 700; white-space: nowrap;
+            transition: all .2s;
+            box-shadow: 0 0 18px rgba(0,255,163,.22);
+        }
+        .contract-verify-badge:hover {
+            background: #7dffd0;
+            border-color: #7dffd0;
+            transform: translateY(-1px);
+        }
         .copy-btn {
             background: rgba(0,152,234,.15); border: 1px solid rgba(0,152,234,.3);
             border-radius: 6px; padding: 4px 8px; cursor: pointer; color: var(--blue);
@@ -647,8 +662,9 @@
             .hero-stats { grid-template-columns: repeat(2,1fr); }
             .stat-card { padding: 14px; }
             .stat-value { font-size: 18px; }
-            .contract-box { width: 100%; justify-content: space-between; overflow: hidden; }
+            .contract-box { width: 100%; justify-content: space-between; overflow: hidden; flex-wrap: wrap; }
             .contract-address { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .contract-verify-badge { flex: 1 0 100%; justify-content: center; }
             .hero-visual { min-height: 330px; }
             .token-coin { width: 160px; }
             .token-coin span { font-size: 44px; }
