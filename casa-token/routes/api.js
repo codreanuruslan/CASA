@@ -217,7 +217,7 @@ async function fetchJson(url) {
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: 'application/json' }
+      headers: { Accept: 'application/json', ...(process.env.TONAPI_KEY && { Authorization: `Bearer ${process.env.TONAPI_KEY}` }) }
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
